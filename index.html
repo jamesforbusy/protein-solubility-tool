@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>蛋白質可溶性分析工具</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            border: "hsl(214.3 31.8% 91.4%)",
+            input: "hsl(214.3 31.8% 91.4%)",
+            ring: "hsl(221.2 83.2% 53.3%)",
+            background: "hsl(0 0% 100%)",
+            foreground: "hsl(222.2 84% 4.9%)",
+            primary: { DEFAULT: "hsl(221.2 83.2% 53.3%)", foreground: "hsl(210 40% 98%)" },
+            muted: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(215.4 16.3% 46.9%)" },
+            card: { DEFAULT: "hsl(0 0% 100%)", foreground: "hsl(222.2 84% 4.9%)" },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    textarea { resize: vertical; }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+    .badge-blue   { background: #dbeafe; color: #1e40af; }
+    .badge-gray   { background: #f3f4f6; color: #374151; }
+    .risk-row td { padding: 6px 8px; font-size: 0.875rem; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 py-8">
+
+<div class="max-w-3xl mx-auto px-4">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-2xl font-semibold tracking-tight text-gray-900">蛋白質可溶性分析</h1>
+    <p class="mt-1 text-sm text-gray-500">評估蛋白質序列在大腸桿菌（E. coli）中的可溶性表現風險</p>
+  </div>
+
+  <!-- Input Card -->
+  <div class="rounded-lg border border-gray-200 bg-white shadow-sm mb-6">
+    <div class="p-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">蛋白質序列</label>
+      <textarea
+        id="seqInput"
+        rows="5"
+        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        placeholder="貼上序列（FASTA 格式或純胺基酸序列，支援 gap 字元 -/. 會自動去除）"
+      ></textarea>
+      <div class="mt-3 flex items-center gap-3">
+        <button
+          onclick="analyze()"
+          class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+        >分析</button>
+        <button
+          onclick="clearAll()"
+          class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+        >清除</button>
+        <span id="seqLen" class="text-xs text-gray-400"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results (hidden initially) -->
+  <div id="results" class="hidden space-y-6">
+
+    <!-- Properties Table -->
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">理化性質</h2>
+      </div>
+      <div class="p-6">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="pb-2 text-left font-medium text-gray-500">指標</th>
+              <th class="pb-2 text-right font-medium text-gray-500">數值</th>
+              <th class="pb-2 text-right font-medium text-gray-500">評估</th>
+            </tr>
+          </thead>
+          <tbody id="propsTable" class="divide-y divide-gray-50 text-gray-800"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Risk Assessment -->
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">大腸桿菌可溶性風險評估</h2>
+      </div>
+      <div class="p-6 space-y-4">
+        <div id="overallRisk" class="flex items-center gap-3 p-4 rounded-lg bg-gray-50"></div>
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">詳細因子</h3>
+          <table class="w-full">
+            <tbody id="riskTable" class="space-y-1"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">建議表現策略</h2>
+      </div>
+      <div id="recommendations" class="p-6 space-y-2 text-sm text-gray-700"></div>
+    </div>
+
+    <!-- TM Window Chart (if detected) -->
+    <div id="tmSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">疏水性滑動窗口（Kyte-Doolittle, window=19）</h2>
+        <p class="text-xs text-gray-400 mt-0.5">得分 &gt;1.6 的區段視為潛在跨膜域</p>
+      </div>
+      <div class="p-6">
+        <div id="tmChart" class="overflow-x-auto"></div>
+        <div id="tmList" class="mt-4 space-y-1 text-sm"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Data Tables ───────────────────────────────────────────────────────────
+
+const AA_MW = {
+  "A": 89.0932,"C": 121.1582,"D": 133.1027,"E": 147.1293,"F": 165.1891,
+  "G": 75.0666,"H": 155.1546,"I": 131.1729,"K": 146.1876,"L": 131.1729,
+  "M": 149.2113,"N": 132.1179,"P": 115.1305,"Q": 146.1445,"R": 174.2010,
+  "S": 105.0926,"T": 119.1192,"V": 117.1463,"W": 204.2252,"Y": 181.1885
+};
+
+const KD = {
+  "A": 1.8,"R":-4.5,"N":-3.5,"D":-3.5,"C": 2.5,"Q":-3.5,"E":-3.5,
+  "G":-0.4,"H":-3.2,"I": 4.5,"L": 3.8,"K":-3.9,"M": 1.9,"F": 2.8,
+  "P":-1.6,"S":-0.8,"T":-0.7,"W":-0.9,"Y":-1.3,"V": 4.2
+};
+
+// DIWV — only non-1.0 entries (Guruprasad 1990, as in Biopython)
+const DIWV = {
+  "AC":44.94,"AD":-7.49,"AH":-7.49,"AP":20.26,
+  "CD":20.26,"CH":33.6,"CL":20.26,"CM":33.6,"CP":20.26,"CQ":-6.54,"CT":33.6,"CV":-6.54,"CW":24.68,
+  "DF":-6.54,"DK":-7.49,"DR":-6.54,"DS":20.26,"DT":-14.03,
+  "EC":44.94,"ED":20.26,"EE":33.6,"EH":-6.54,"EI":20.26,"EP":20.26,"EQ":20.26,"ES":20.26,"EW":-14.03,
+  "FD":13.34,"FK":-14.03,"FP":20.26,"FY":33.601,
+  "GA":-7.49,"GE":-6.54,"GG":13.34,"GI":-7.49,"GK":-7.49,"GN":-7.49,"GT":-7.49,"GW":13.34,"GY":-7.49,
+  "HF":-9.37,"HG":-9.37,"HI":44.94,"HK":24.68,"HN":24.68,"HP":-1.88,"HT":-6.54,"HW":-1.88,"HY":44.94,
+  "IE":44.94,"IH":13.34,"IK":-7.49,"IL":20.26,"IP":-1.88,"IV":-7.49,
+  "KG":-7.49,"KI":-7.49,"KL":-7.49,"KM":33.6,"KP":-6.54,"KQ":24.64,"KR":33.6,"KV":-7.49,
+  "LK":-7.49,"LP":20.26,"LQ":33.6,"LR":20.26,"LW":24.68,
+  "MA":13.34,"MH":58.28,"MM":-1.88,"MP":44.94,"MQ":-6.54,"MR":-6.54,"MS":44.94,"MT":-1.88,"MY":24.68,
+  "NC":-1.88,"NF":-14.03,"NG":-14.03,"NI":44.94,"NK":24.68,"NP":-1.88,"NQ":-6.54,"NT":-7.49,"NW":-9.37,
+  "PA":20.26,"PC":-6.54,"PD":-6.54,"PE":18.38,"PF":20.26,"PM":-6.54,"PP":20.26,"PQ":20.26,
+  "PR":-6.54,"PS":20.26,"PV":20.26,"PW":-1.88,
+  "QC":-6.54,"QD":20.26,"QE":20.26,"QF":-6.54,"QP":20.26,"QQ":20.26,"QS":44.94,"QV":-6.54,"QY":-6.54,
+  "RG":-7.49,"RH":20.26,"RN":13.34,"RP":20.26,"RQ":20.26,"RR":58.28,"RS":44.94,"RW":58.28,"RY":-6.54,
+  "SC":33.6,"SE":20.26,"SP":44.94,"SQ":20.26,"SR":20.26,"SS":20.26,
+  "TE":20.26,"TF":13.34,"TG":-7.49,"TN":-14.03,"TQ":-6.54,"TW":-14.03,
+  "VD":-14.03,"VG":-7.49,"VK":-1.88,"VP":20.26,"VT":-7.49,"VY":-6.54,
+  "WA":-14.03,"WG":-9.37,"WH":24.68,"WL":13.34,"WM":24.68,"WN":13.34,"WT":-14.03,"WV":-7.49,
+  "YA":24.68,"YD":24.68,"YE":-6.54,"YG":-7.49,"YH":13.34,"YM":44.94,"YP":13.34,
+  "YR":-15.91,"YT":-7.49,"YW":-9.37,"YY":13.34
+};
+
+// pKa values (Bjellqvist, as in Biopython)
+const PKa_pos   = { Nterm: 7.5, K: 10.0, R: 12.0, H: 5.98 };
+const PKa_neg   = { Cterm: 3.55, D: 4.05, E: 4.45, C: 9.0, Y: 10.0 };
+const PKa_cterm = { D: 4.55, E: 4.75 };
+const PKa_nterm = { A: 7.59, M: 7.0, S: 6.93, P: 8.36, T: 6.82, V: 7.44, E: 7.7 };
+
+// ─── Core Calculations ─────────────────────────────────────────────────────
+
+function cleanSeq(raw) {
+  const lines = raw.split('\n');
+  const seq = lines
+    .filter(l => !l.startsWith('>'))
+    .join('')
+    .replace(/[\s\-\.]/g, '')
+    .toUpperCase();
+  return seq;
+}
+
+function countAA(seq) {
+  const c = {};
+  for (const aa of 'ACDEFGHIKLMNPQRSTVWY') c[aa] = 0;
+  for (const aa of seq) if (aa in c) c[aa]++;
+  return c;
+}
+
+function calcMW(seq) {
+  const counts = countAA(seq);
+  let mw = 18.0153; // water
+  for (const [aa, n] of Object.entries(counts)) {
+    if (AA_MW[aa]) mw += n * (AA_MW[aa] - 18.0153);
+  }
+  return mw;
+}
+
+function chargeAtPH(seq, counts, pH) {
+  const nterm = seq[0];
+  const cterm = seq[seq.length - 1];
+  const nPKa = PKa_nterm[nterm] ?? PKa_pos.Nterm;
+  const cPKa = PKa_cterm[cterm] ?? PKa_neg.Cterm;
+
+  let pos = 1 / (1 + Math.pow(10, pH - nPKa));
+  pos += counts['K'] * (1 / (1 + Math.pow(10, pH - PKa_pos.K)));
+  pos += counts['R'] * (1 / (1 + Math.pow(10, pH - PKa_pos.R)));
+  pos += counts['H'] * (1 / (1 + Math.pow(10, pH - PKa_pos.H)));
+
+  let neg = 1 / (1 + Math.pow(10, cPKa - pH));
+  neg += counts['D'] * (1 / (1 + Math.pow(10, PKa_neg.D - pH)));
+  neg += counts['E'] * (1 / (1 + Math.pow(10, PKa_neg.E - pH)));
+  neg += counts['C'] * (1 / (1 + Math.pow(10, PKa_neg.C - pH)));
+  neg += counts['Y'] * (1 / (1 + Math.pow(10, PKa_neg.Y - pH)));
+
+  return pos - neg;
+}
+
+function calcPI(seq, counts) {
+  let lo = 0, hi = 14;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    chargeAtPH(seq, counts, mid) > 0 ? lo = mid : hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function calcGRAVY(seq) {
+  let sum = 0, n = 0;
+  for (const aa of seq) {
+    if (KD[aa] !== undefined) { sum += KD[aa]; n++; }
+  }
+  return n > 0 ? sum / n : 0;
+}
+
+function calcInstability(seq) {
+  let sum = 0;
+  for (let i = 0; i < seq.length - 1; i++) {
+    const key = seq[i] + seq[i+1];
+    sum += DIWV[key] ?? 1.0;
+  }
+  return (10.0 / seq.length) * sum;
+}
+
+function calcAliphatic(seq, counts) {
+  const L = seq.length;
+  return (counts['A']/L*100) + 2.9*(counts['V']/L*100) + 3.9*((counts['I']+counts['L'])/L*100);
+}
+
+function calcTMWindows(seq, window = 19, threshold = 1.6) {
+  const scores = [];
+  for (let i = 0; i <= seq.length - window; i++) {
+    let s = 0;
+    for (let j = i; j < i + window; j++) s += KD[seq[j]] ?? 0;
+    scores.push({ pos: i + 1, score: s / window });
+  }
+  // merge regions above threshold
+  const hits = scores.filter(x => x.score > threshold);
+  if (!hits.length) return { scores, regions: [] };
+  const regions = [];
+  let rStart = hits[0].pos, rEnd = hits[0].pos + window - 1, rPeak = hits[0].score, rPeakPos = hits[0].pos;
+  for (let i = 1; i < hits.length; i++) {
+    if (hits[i].pos <= rEnd + 1) {
+      const end = hits[i].pos + window - 1;
+      if (end > rEnd) rEnd = end;
+      if (hits[i].score > rPeak) { rPeak = hits[i].score; rPeakPos = hits[i].pos; }
+    } else {
+      regions.push({ start: rStart, end: rEnd, peak: rPeak, peakPos: rPeakPos, seq: seq.slice(rStart-1, rEnd) });
+      rStart = hits[i].pos; rEnd = hits[i].pos + window - 1; rPeak = hits[i].score; rPeakPos = hits[i].pos;
+    }
+  }
+  regions.push({ start: rStart, end: rEnd, peak: rPeak, peakPos: rPeakPos, seq: seq.slice(rStart-1, rEnd) });
+  return { scores, regions };
+}
+
+// ─── UI Rendering ──────────────────────────────────────────────────────────
+
+function badge(text, type) {
+  const cls = { green:'badge-green', red:'badge-red', yellow:'badge-yellow', blue:'badge-blue', gray:'badge-gray' }[type] || 'badge-gray';
+  return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}">${text}</span>`;
+}
+
+function analyze() {
+  const raw = document.getElementById('seqInput').value.trim();
+  if (!raw) return;
+  const seq = cleanSeq(raw);
+  if (seq.length < 5) { alert('序列太短，請確認輸入正確'); return; }
+
+  const counts = countAA(seq);
+  const mw = calcMW(seq);
+  const pi = calcPI(seq, counts);
+  const gravy = calcGRAVY(seq);
+  const inst = calcInstability(seq);
+  const ali = calcAliphatic(seq, counts);
+  const cys = counts['C'];
+  const { scores, regions: tmRegions } = calcTMWindows(seq);
+
+  const R = counts['R'], K = counts['K'], D = counts['D'], E = counts['E'];
+  const net = (R + K) - (D + E);
+
+  // ── Properties Table ──
+  const rows = [
+    ['序列長度',    `${seq.length} aa`,             badge('—','gray')],
+    ['分子量',      `${(mw/1000).toFixed(2)} kDa`,  badge(mw > 60000 ? '偏大' : '適中', mw > 60000 ? 'yellow' : 'green')],
+    ['等電點 (pI)', pi.toFixed(2),                  badge(pi < 5 || pi > 9 ? '偏極端' : '接近中性', pi < 5 || pi > 9 ? 'yellow' : 'green')],
+    ['GRAVY index', gravy.toFixed(4),               badge(gravy >= 0 ? '偏疏水' : '親水', gravy >= 0 ? 'red' : 'green')],
+    ['不穩定指數',  inst.toFixed(2),                badge(inst < 40 ? '穩定' : '不穩定', inst < 40 ? 'green' : 'red')],
+    ['Cys 數量',    `${cys} 個（${Math.floor(cys/2)} 對潛在二硫鍵）`, badge(cys === 0 ? '無顧慮' : cys <= 2 ? '低' : cys <= 4 ? '中' : '高', cys === 0 ? 'green' : cys <= 2 ? 'blue' : cys <= 4 ? 'yellow' : 'red')],
+    ['帶電胺基酸',  `R=${R} K=${K} D=${D} E=${E}（淨電荷 ${net >= 0 ? '+' : ''}${net}）`, badge('—','gray')],
+    ['Aliphatic index', ali.toFixed(2),             badge(ali > 90 ? '高疏水骨架' : '正常', ali > 90 ? 'yellow' : 'green')],
+    ['跨膜區',      tmRegions.length > 0 ? `偵測到 ${tmRegions.length} 個區段` : '未偵測到', badge(tmRegions.length > 0 ? '有跨膜域' : '無跨膜域', tmRegions.length > 0 ? 'red' : 'green')],
+  ];
+
+  document.getElementById('propsTable').innerHTML = rows.map(([name, val, b]) =>
+    `<tr>
+      <td class="py-2.5 text-gray-600 font-medium w-1/3">${name}</td>
+      <td class="py-2.5 text-gray-800 font-mono text-sm w-1/2">${val}</td>
+      <td class="py-2.5 text-right">${b}</td>
+    </tr>`
+  ).join('');
+
+  // ── Risk Factors ──
+  const risks = [], goods = [];
+  if (tmRegions.length > 0)
+    risks.push(`含跨膜疏水區段（${tmRegions.map(r=>`${r.start}-${r.end}`).join(', ')}），大腸桿菌細胞質表現幾乎確定不溶`);
+  if (cys >= 6)
+    risks.push(`Cys=${cys}（${Math.floor(cys/2)} 對二硫鍵），大腸桿菌細胞質還原環境下折疊困難`);
+  else if (cys >= 3)
+    risks.push(`Cys=${cys}，需氧化環境協助二硫鍵形成`);
+  else if (cys > 0)
+    risks.push(`Cys=${cys}，少量二硫鍵，建議確認折疊策略`);
+  if (inst >= 40)
+    risks.push(`不穩定指數 ${inst.toFixed(1)}（≥40），預測體外不穩定，可能影響收率`);
+  if (gravy >= 0.2)
+    risks.push(`GRAVY ${gravy.toFixed(3)}（偏疏水），傾向聚集或進入 inclusion body`);
+  if (mw > 60000)
+    risks.push(`分子量 ${(mw/1000).toFixed(1)} kDa，大蛋白質表現效率通常較低`);
+
+  if (gravy < -0.2) goods.push(`GRAVY ${gravy.toFixed(3)}：序列整體親水，有利可溶`);
+  else if (gravy < 0) goods.push(`GRAVY ${gravy.toFixed(3)}：輕微親水，可接受`);
+  if (inst < 40) goods.push(`不穩定指數 ${inst.toFixed(1)}：預測穩定（<40）`);
+  if (cys === 0) goods.push('無 Cys，不需考慮二硫鍵折疊問題');
+  if (tmRegions.length === 0) goods.push('無跨膜域，可直接做胞質可溶性表現');
+  if (mw <= 60000) goods.push(`分子量 ${(mw/1000).toFixed(1)} kDa，大小適合大腸桿菌表現`);
+
+  // Overall risk level
+  let riskLevel, riskColor, riskText;
+  const rScore = (tmRegions.length > 0 ? 3 : 0) + (cys >= 6 ? 3 : cys >= 3 ? 2 : cys > 0 ? 1 : 0) + (inst >= 40 ? 1 : 0) + (gravy >= 0.2 ? 1 : 0);
+  if (rScore === 0) { riskLevel = '低風險'; riskColor = 'bg-green-50 border border-green-200 text-green-800'; riskText = '可溶性表現可行性高'; }
+  else if (rScore <= 2) { riskLevel = '中等風險'; riskColor = 'bg-yellow-50 border border-yellow-200 text-yellow-800'; riskText = '需採用特定菌株或條件'; }
+  else { riskLevel = '高風險'; riskColor = 'bg-red-50 border border-red-200 text-red-800'; riskText = '直接大腸桿菌表現可能失敗，建議調整策略'; }
+
+  document.getElementById('overallRisk').className = `flex items-center gap-3 p-4 rounded-lg ${riskColor}`;
+  document.getElementById('overallRisk').innerHTML =
+    `<div class="text-2xl">${rScore === 0 ? '✓' : rScore <= 2 ? '⚠' : '✕'}</div>
+     <div><div class="font-semibold">${riskLevel}</div><div class="text-sm mt-0.5">${riskText}</div></div>`;
+
+  const allFactors = [
+    ...risks.map(t => `<tr class="risk-row"><td class="text-red-500 w-5">✕</td><td>${t}</td></tr>`),
+    ...goods.map(t => `<tr class="risk-row"><td class="text-green-600 w-5">✓</td><td>${t}</td></tr>`),
+  ];
+  document.getElementById('riskTable').innerHTML = allFactors.join('');
+
+  // ── Recommendations ──
+  const recs = [];
+  if (tmRegions.length > 0) {
+    recs.push({ icon: '1', text: '考慮截去跨膜域，只表現胞外可溶區段（ectodomain）' });
+    recs.push({ icon: '2', text: '若需全長，改用真核系統（HEK293、CHO）或昆蟲細胞（Baculovirus）' });
+  } else {
+    if (cys >= 3) {
+      recs.push({ icon: '1', text: 'SHuffle T7 Express 菌株（NEB #C3029）— 胞質具氧化折疊能力，最直接方案' });
+      recs.push({ icon: '2', text: 'Periplasm 表現（pelB 或 ompA signal peptide）— 氧化環境，二硫鍵可正確形成' });
+    } else if (cys > 0) {
+      recs.push({ icon: '1', text: 'SHuffle T7 菌株或一般菌株加 DsbA/DsbC 共表現' });
+    } else {
+      recs.push({ icon: '1', text: '標準 BL21(DE3) 菌株即可，無二硫鍵顧慮' });
+    }
+    if (inst >= 40 || gravy >= 0) {
+      recs.push({ icon: recs.length + 1, text: 'MBP 或 SUMO fusion tag 可提升可溶性（純化後可切除）' });
+    }
+    recs.push({ icon: recs.length + 1, text: '低溫誘導建議：16–18°C，0.1–0.2 mM IPTG，過夜（12–16 h）' });
+    recs.push({ icon: recs.length + 1, text: 'His6-tag（N 端或 C 端）方便 Ni-NTA 親和純化' });
+    recs.push({ icon: recs.length + 1, text: '先做小量篩選：37°C vs 18°C，soluble/insoluble fraction western blot 確認' });
+  }
+
+  document.getElementById('recommendations').innerHTML = recs.map(r =>
+    `<div class="flex items-start gap-3">
+      <span class="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold mt-0.5">${r.icon}</span>
+      <span>${r.text}</span>
+    </div>`
+  ).join('');
+
+  // ── TM Section ──
+  if (tmRegions.length > 0) {
+    document.getElementById('tmSection').classList.remove('hidden');
+    // Mini bar chart using div widths
+    const maxScore = Math.max(...scores.map(s => s.score));
+    const step = Math.max(1, Math.floor(scores.length / 120));
+    const bars = scores.filter((_, i) => i % step === 0).map(({ pos, score }) => {
+      const h = Math.max(0, Math.round((score / 4) * 40));
+      const color = score > 1.6 ? 'bg-red-400' : score > 0.5 ? 'bg-blue-300' : 'bg-gray-200';
+      return `<div class="inline-block w-1 ${color} align-bottom" style="height:${h}px" title="pos ${pos}: ${score.toFixed(2)}"></div>`;
+    }).join('');
+    document.getElementById('tmChart').innerHTML =
+      `<div class="flex items-end gap-px" style="height:44px">${bars}</div>
+       <div class="flex justify-between text-xs text-gray-400 mt-1"><span>1</span><span>${seq.length}</span></div>`;
+
+    document.getElementById('tmList').innerHTML = tmRegions.map(r =>
+      `<div class="flex items-start gap-2 p-2 rounded-md bg-red-50 text-red-800 text-sm">
+        <span class="font-mono font-medium">位置 ${r.start}–${r.end}</span>
+        <span class="text-red-400">|</span>
+        <span class="font-mono text-xs">${r.seq}</span>
+        <span class="ml-auto text-xs text-red-500">峰值 ${r.peak.toFixed(2)}</span>
+      </div>`
+    ).join('');
+  } else {
+    document.getElementById('tmSection').classList.add('hidden');
+  }
+
+  document.getElementById('results').classList.remove('hidden');
+}
+
+function clearAll() {
+  document.getElementById('seqInput').value = '';
+  document.getElementById('seqLen').textContent = '';
+  document.getElementById('results').classList.add('hidden');
+}
+
+document.getElementById('seqInput').addEventListener('input', function() {
+  const seq = cleanSeq(this.value);
+  document.getElementById('seqLen').textContent = seq.length > 0 ? `${seq.length} aa` : '';
+});
+
+document.getElementById('seqInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyze();
+});
+</script>
+</body>
+</html>
