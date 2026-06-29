@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>蛋白質可溶性分析工具</title>
-  <!-- 部署 Cloudflare Worker 後，將 WORKER_URL 換成您的 Worker 網址 -->
-  <!-- 例如: https://protein-sol-proxy.yourname.workers.dev -->
-  <script>const WORKER_URL = 'WORKER_URL';</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -117,60 +114,44 @@
       <div id="recommendations" class="p-6 space-y-2 text-sm text-gray-700"></div>
     </div>
 
-    <!-- Protein-Sol External Result -->
-    <div id="proteinSolSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h2 class="text-base font-semibold text-gray-900">Protein-Sol 外部預測</h2>
-          <p class="text-xs text-gray-400 mt-0.5">University of Manchester · 35 個序列特徵 · E. coli 表現資料庫訓練</p>
-        </div>
-        <a id="proteinSolLink" href="#" target="_blank" class="text-xs text-blue-500 hover:underline">在 Protein-Sol 查看完整報告 ↗</a>
+    <!-- External Tools -->
+    <div id="externalTools" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">進階外部工具</h2>
+        <p class="text-xs text-gray-400 mt-0.5">複製序列後前往外部工具做進一步預測</p>
       </div>
-      <div class="p-6">
-        <div id="proteinSolLoading" class="flex items-center gap-3 text-sm text-gray-500">
-          <svg class="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-          </svg>
-          正在提交到 Protein-Sol 計算中（約 8–15 秒）…
+      <div class="p-6 space-y-3">
+        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+          <div>
+            <div class="text-sm font-medium text-gray-800">Protein-Sol</div>
+            <div class="text-xs text-gray-400">University of Manchester · 35 個特徵 · E. coli 0–1 分數</div>
+          </div>
+          <button onclick="copyAndOpen('https://protein-sol.manchester.ac.uk/')"
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+            複製序列並開啟 ↗
+          </button>
         </div>
-        <div id="proteinSolResult" class="hidden">
-          <div class="flex items-end gap-4 mb-4">
-            <div>
-              <div class="text-xs text-gray-400 mb-1">預測可溶性分數</div>
-              <div id="proteinSolScore" class="text-4xl font-bold text-gray-900"></div>
-              <div class="text-xs text-gray-400 mt-0.5">0–1 scale（E. coli 平均值 0.45）</div>
-            </div>
-            <div id="proteinSolBadge" class="mb-1"></div>
+        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+          <div>
+            <div class="text-sm font-medium text-gray-800">CamSol</div>
+            <div class="text-xs text-gray-400">University of Cambridge · 抗體可溶性優化 · 支援 pH 依賴預測</div>
           </div>
-          <!-- Score bar -->
-          <div class="relative h-3 rounded-full bg-gray-100 mb-2">
-            <div class="absolute top-0 left-0 h-full rounded-full transition-all duration-700" id="proteinSolBar"></div>
-            <div class="absolute top-0 h-full w-px bg-gray-400" style="left:45%"></div>
-          </div>
-          <div class="flex justify-between text-xs text-gray-400 mb-4">
-            <span>0（不可溶）</span>
-            <span style="margin-left:43%">E. coli 平均 0.45</span>
-            <span>1（高度可溶）</span>
-          </div>
-          <div id="proteinSolInterpret" class="text-sm text-gray-600 p-3 rounded-md bg-gray-50"></div>
+          <button onclick="copyAndOpen('https://www-cohsoftware.ch.cam.ac.uk/index.php/camsolph')"
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+            複製序列並開啟 ↗
+          </button>
         </div>
-        <div id="proteinSolError" class="hidden text-sm text-red-500 p-3 rounded-md bg-red-50"></div>
-        <div id="proteinSolNoWorker" class="hidden text-sm text-gray-500">
-          <p>尚未設定 Cloudflare Worker。請依照以下步驟啟用 Protein-Sol 整合：</p>
-          <ol class="mt-2 space-y-1 list-decimal list-inside text-xs text-gray-400">
-            <li>前往 <a href="https://dash.cloudflare.com" target="_blank" class="text-blue-400 hover:underline">dash.cloudflare.com</a> 建立免費帳號</li>
-            <li>Workers &amp; Pages → Create Worker → 貼上 <code class="bg-gray-100 px-1 rounded">worker.js</code> 內容</li>
-            <li>Deploy 後複製 Worker 網址</li>
-            <li>將 <code class="bg-gray-100 px-1 rounded">index.html</code> 第 7 行的 <code class="bg-gray-100 px-1 rounded">WORKER_URL</code> 換成該網址</li>
-          </ol>
-          <div class="mt-3">
-            <a id="camsolLink" href="https://www-cohsoftware.ch.cam.ac.uk/index.php/camsolph" target="_blank"
-               class="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline">
-              或直接前往 CamSol（抗體可溶性最佳化工具）↗
-            </a>
+        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+          <div>
+            <div class="text-sm font-medium text-gray-800">DeepSol（GitHub）</div>
+            <div class="text-xs text-gray-400">MIT · CNN 深度學習 · 準確度 0.77 · 需本機安裝</div>
           </div>
+          <a href="https://github.com/khurana-lab/DeepSol" target="_blank"
+            class="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200">
+            前往 GitHub ↗
+          </a>
         </div>
+        <p id="copyDoneMsg" class="hidden text-xs text-green-600 text-center pt-1">✓ 序列已複製到剪貼簿，請在開啟的網頁中貼上</p>
       </div>
     </div>
 
@@ -354,6 +335,7 @@ function analyze() {
   if (!raw) return;
   const seq = cleanSeq(raw);
   if (seq.length < 5) { alert('序列太短，請確認輸入正確'); return; }
+  _lastSeq = seq;
 
   const counts = countAA(seq);
   const mw = calcMW(seq);
@@ -487,89 +469,18 @@ function analyze() {
   }
 
   document.getElementById('results').classList.remove('hidden');
-
-  // ── Protein-Sol integration ──────────────────────────────────────────────
-  const psSection   = document.getElementById('proteinSolSection');
-  const psLoading   = document.getElementById('proteinSolLoading');
-  const psResult    = document.getElementById('proteinSolResult');
-  const psError     = document.getElementById('proteinSolError');
-  const psNoWorker  = document.getElementById('proteinSolNoWorker');
-
-  psSection.classList.remove('hidden');
-  psLoading.classList.remove('hidden');
-  psResult.classList.add('hidden');
-  psError.classList.add('hidden');
-  psNoWorker.classList.add('hidden');
-
-  if (!WORKER_URL || WORKER_URL === 'WORKER_URL') {
-    psLoading.classList.add('hidden');
-    psNoWorker.classList.remove('hidden');
-  } else {
-    submitToProteinSol(seq);
-  }
+  document.getElementById('externalTools').classList.remove('hidden');
 }
 
-async function submitToProteinSol(seq) {
-  const psLoading  = document.getElementById('proteinSolLoading');
-  const psResult   = document.getElementById('proteinSolResult');
-  const psError    = document.getElementById('proteinSolError');
-  const psNoWorker = document.getElementById('proteinSolNoWorker');
+let _lastSeq = '';
 
-  try {
-    // Step 1: submit
-    const submitResp = await fetch(`${WORKER_URL}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sequence: seq }),
-    });
-    const { jobId, error: submitErr } = await submitResp.json();
-    if (submitErr) throw new Error(submitErr);
-
-    document.getElementById('proteinSolLink').href =
-      `https://protein-sol.manchester.ac.uk/results/solubility/run-${jobId}/results.html`;
-
-    // Step 2: poll
-    let score = null;
-    for (let i = 0; i < 12; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const pollResp = await fetch(`${WORKER_URL}/poll?jobId=${jobId}`);
-      const data = await pollResp.json();
-      if (data.ready) { score = data.score; break; }
-    }
-    if (score === null) throw new Error('計算逾時，請直接前往 Protein-Sol 查看結果');
-
-    // Render result
-    psLoading.classList.add('hidden');
-    psResult.classList.remove('hidden');
-    document.getElementById('proteinSolScore').textContent = score.toFixed(3);
-
-    const bar = document.getElementById('proteinSolBar');
-    bar.style.width = `${score * 100}%`;
-    bar.className = `absolute top-0 left-0 h-full rounded-full transition-all duration-700 ${
-      score >= 0.55 ? 'bg-green-400' : score >= 0.45 ? 'bg-yellow-400' : 'bg-red-400'
-    }`;
-
-    const bdg = document.getElementById('proteinSolBadge');
-    if (score >= 0.55) {
-      bdg.innerHTML = '<span class="badge-green inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">高可溶性</span>';
-    } else if (score >= 0.45) {
-      bdg.innerHTML = '<span class="badge-yellow inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">中等</span>';
-    } else {
-      bdg.innerHTML = '<span class="badge-red inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">低可溶性</span>';
-    }
-
-    const interp = score >= 0.55
-      ? `分數 ${score.toFixed(3)} 高於 E. coli 資料庫平均值（0.45），預測可溶性良好。`
-      : score >= 0.45
-      ? `分數 ${score.toFixed(3)} 接近 E. coli 平均值（0.45），可溶性屬中等，建議優化表現條件。`
-      : `分數 ${score.toFixed(3)} 低於 E. coli 平均值（0.45），預測可溶性偏低，進入 inclusion body 風險高。`;
-    document.getElementById('proteinSolInterpret').textContent = interp;
-
-  } catch (e) {
-    psLoading.classList.add('hidden');
-    psError.classList.remove('hidden');
-    psError.textContent = `Protein-Sol 錯誤：${e.message}`;
-  }
+function copyAndOpen(url) {
+  navigator.clipboard.writeText(_lastSeq).then(() => {
+    const msg = document.getElementById('copyDoneMsg');
+    msg.classList.remove('hidden');
+    setTimeout(() => msg.classList.add('hidden'), 3000);
+  });
+  window.open(url, '_blank');
 }
 
 function clearAll() {
