@@ -263,7 +263,7 @@
           <h2 class="text-base font-semibold text-gray-900">NetSolP 手動查詢</h2>
           <p class="text-xs text-gray-400 mt-0.5">DTU · ESM1b Transformer · AUC 0.760 · 閾值 0.69（Youden Index）</p>
         </div>
-        <a href="https://services.healthtech.dtu.dk/service.php?NetSolP" target="_blank"
+        <a href="https://services.healthtech.dtu.dk/services/NetSolP-1.0/" target="_blank"
            class="text-xs text-blue-500 hover:underline">前往 NetSolP ↗</a>
       </div>
       <div class="p-6 flex items-start gap-6">
@@ -650,7 +650,7 @@ function copyAndOpenNetSolP() {
     msg.classList.remove('hidden');
     setTimeout(() => msg.classList.add('hidden'), 3000);
   });
-  window.open('https://services.healthtech.dtu.dk/service.php?NetSolP', '_blank');
+  window.open('https://services.healthtech.dtu.dk/services/NetSolP-1.0/', '_blank');
 }
 
 async function submitToProteinSol(seq) {
