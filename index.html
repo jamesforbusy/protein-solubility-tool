@@ -186,6 +186,54 @@
       </div>
     </div>
 
+    <!-- ccSOL omics Integration -->
+    <div id="ccSolSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900">ccSOL omics 外部預測</h2>
+          <p class="text-xs text-gray-400 mt-0.5">IIT · 滑動窗口法 · E. coli 異源表現資料庫訓練（準確度 74%）</p>
+        </div>
+        <a href="https://tools.tartaglialab.com/new_submission/ccsol_omics" target="_blank"
+           class="text-xs text-blue-500 hover:underline">在 ccSOL 查看完整報告 ↗</a>
+      </div>
+      <div class="p-6">
+
+        <!-- Loading -->
+        <div id="ccLoading" class="hidden flex items-center gap-3 text-sm text-gray-500">
+          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          正在提交到 ccSOL omics 計算中（約 15–30 秒）…
+        </div>
+
+        <!-- Result -->
+        <div id="ccResult" class="hidden">
+          <div class="flex items-end gap-4 mb-4">
+            <div>
+              <div class="text-xs text-gray-400 mb-1">可溶性傾向</div>
+              <div id="ccScore" class="text-4xl font-bold text-gray-900"></div>
+              <div class="text-xs text-gray-400 mt-0.5">0–100%（E. coli 異源表現資料庫）</div>
+            </div>
+            <div id="ccBadge" class="mb-1"></div>
+            <div id="ccReliability" class="mb-1 text-xs text-gray-400"></div>
+          </div>
+          <div class="relative h-3 rounded-full bg-gray-100 mb-1">
+            <div id="ccBar" class="absolute top-0 left-0 h-full rounded-full transition-all duration-700"></div>
+            <div class="absolute top-0 h-full w-px bg-gray-400 opacity-50" style="left:60%"></div>
+          </div>
+          <div class="flex justify-between text-xs text-gray-400 mb-4">
+            <span>0% 不可溶</span><span>建議閾值 60%</span><span>100% 高度可溶</span>
+          </div>
+          <p id="ccInterpret" class="text-sm text-gray-600 p-3 rounded-md bg-gray-50"></p>
+        </div>
+
+        <!-- Error -->
+        <div id="ccError" class="hidden text-sm text-red-600 p-3 rounded-md bg-red-50"></div>
+
+      </div>
+    </div>
+
     <!-- TM Window Chart (if detected) -->
     <div id="tmSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 px-6 py-4">
@@ -513,6 +561,20 @@ function analyze() {
     document.getElementById('psLoading').classList.remove('hidden');
     submitToProteinSol(seq);
   }
+
+  // ── ccSOL omics ──────────────────────────────────────────────────────────
+  const ccSection = document.getElementById('ccSolSection');
+  ccSection.classList.remove('hidden');
+  ['ccLoading','ccResult','ccError'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+
+  if (WORKER_URL) {
+    document.getElementById('ccLoading').classList.remove('hidden');
+    submitToCcSOL(seq);
+  } else {
+    document.getElementById('ccError').classList.remove('hidden');
+    document.getElementById('ccError').textContent = '尚未設定 Cloudflare Worker，無法呼叫 ccSOL omics。';
+  }
 }
 
 let _lastSeq = '';
@@ -581,10 +643,65 @@ async function submitToProteinSol(seq) {
   }
 }
 
+async function submitToCcSOL(seq) {
+  try {
+    const submitResp = await fetch(`${WORKER_URL}/submit-ccsol`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sequence: seq }),
+    });
+    const { tableUrl, error: err1 } = await submitResp.json();
+    if (err1) throw new Error(err1);
+
+    // Poll every 5 s, up to 20 times (100 s)
+    let score = null, reliability = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      const pollResp = await fetch(`${WORKER_URL}/poll-ccsol?tableUrl=${encodeURIComponent(tableUrl)}`);
+      const data = await pollResp.json();
+      if (data.ready) { score = data.score; reliability = data.reliability; break; }
+    }
+    if (score === null) throw new Error('計算逾時，請直接前往 ccSOL omics 查看結果');
+
+    document.getElementById('ccLoading').classList.add('hidden');
+    document.getElementById('ccResult').classList.remove('hidden');
+    document.getElementById('ccScore').textContent = `${score}%`;
+
+    const bar = document.getElementById('ccBar');
+    bar.style.width = `${Math.min(score, 100)}%`;
+    bar.className = `absolute top-0 left-0 h-full rounded-full transition-all duration-700 ${
+      score >= 60 ? 'bg-green-400' : score >= 40 ? 'bg-yellow-400' : 'bg-red-400'
+    }`;
+
+    const bdg = document.getElementById('ccBadge');
+    bdg.innerHTML = score >= 60
+      ? '<span class="badge-green inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">高可溶性</span>'
+      : score >= 40
+      ? '<span class="badge-yellow inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">中等</span>'
+      : '<span class="badge-red inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">低可溶性</span>';
+
+    if (reliability !== null) {
+      document.getElementById('ccReliability').textContent = `可靠度 ${reliability}/20`;
+    }
+
+    document.getElementById('ccInterpret').textContent = score >= 60
+      ? `可溶性傾向 ${score}%，高於建議閾值（60%），預測在 E. coli 中可溶性良好。`
+      : score >= 40
+      ? `可溶性傾向 ${score}%，介於 40–60%，可溶性中等，建議考慮添加融合標籤（MBP、SUMO）。`
+      : `可溶性傾向 ${score}%，低於 40%，inclusion body 形成風險高，建議重新設計或使用可溶性融合標籤。`;
+
+  } catch (e) {
+    document.getElementById('ccLoading').classList.add('hidden');
+    document.getElementById('ccError').classList.remove('hidden');
+    document.getElementById('ccError').textContent = `ccSOL 錯誤：${e.message}`;
+  }
+}
+
 function clearAll() {
   document.getElementById('seqInput').value = '';
   document.getElementById('seqLen').textContent = '';
   document.getElementById('results').classList.add('hidden');
+  document.getElementById('ccSolSection').classList.add('hidden');
 }
 
 document.getElementById('seqInput').addEventListener('input', function() {
