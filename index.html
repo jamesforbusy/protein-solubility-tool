@@ -123,7 +123,7 @@
     <div id="finalRecSection" class="hidden rounded-lg border-2 border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 px-6 py-4">
         <h2 class="text-base font-semibold text-gray-900">綜合建議</h2>
-        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics 三項預測結果</p>
+        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics 三項自動預測結果（NetSolP 需手動查詢）</p>
       </div>
       <div class="p-6">
         <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
@@ -253,6 +253,32 @@
         <!-- Error -->
         <div id="ccError" class="hidden text-sm text-red-600 p-3 rounded-md bg-red-50"></div>
 
+      </div>
+    </div>
+
+    <!-- NetSolP Manual Query -->
+    <div id="netSolPSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900">NetSolP 手動查詢</h2>
+          <p class="text-xs text-gray-400 mt-0.5">DTU · ESM1b Transformer · AUC 0.760 · 閾值 0.69（Youden Index）</p>
+        </div>
+        <a href="https://services.healthtech.dtu.dk/service.php?NetSolP" target="_blank"
+           class="text-xs text-blue-500 hover:underline">前往 NetSolP ↗</a>
+      </div>
+      <div class="p-6 flex items-start gap-6">
+        <div class="flex-1 text-sm text-gray-600">
+          <p class="mb-2">NetSolP 使用蛋白質語言模型（ESM1b，6.5 億參數）預測 E. coli 可溶性，為目前獨立驗證集上表現最佳的序列型工具之一。</p>
+          <p class="text-xs text-gray-400">DTU 伺服器佇列較長（約 2–5 分鐘），故不支援自動整合，請手動查詢。</p>
+        </div>
+        <div class="flex-shrink-0 flex flex-col gap-2">
+          <button onclick="copyAndOpenNetSolP()"
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 transition-colors">
+            複製序列並開啟 NetSolP ↗
+          </button>
+          <span id="netSolPCopyMsg" class="hidden text-xs text-green-600 text-center">✓ 已複製到剪貼簿</span>
+          <div class="text-xs text-gray-400 text-center">選 Distilled 模型，速度較快</div>
+        </div>
       </div>
     </div>
 
@@ -599,6 +625,10 @@ function analyze() {
     document.getElementById('ccLoading').classList.remove('hidden');
     submitToCcSOL(seq);
   }
+
+  // ── NetSolP (manual) ─────────────────────────────────────────────────────
+  document.getElementById('netSolPSection').classList.remove('hidden');
+  document.getElementById('netSolPCopyMsg').classList.add('hidden');
 }
 
 let _lastSeq = '';
@@ -611,6 +641,16 @@ function copyAndOpenPS() {
     setTimeout(() => msg.classList.add('hidden'), 3000);
   });
   window.open('https://protein-sol.manchester.ac.uk/', '_blank');
+}
+
+function copyAndOpenNetSolP() {
+  const fasta = `>query\n${_lastSeq}`;
+  navigator.clipboard.writeText(fasta).then(() => {
+    const msg = document.getElementById('netSolPCopyMsg');
+    msg.classList.remove('hidden');
+    setTimeout(() => msg.classList.add('hidden'), 3000);
+  });
+  window.open('https://services.healthtech.dtu.dk/service.php?NetSolP', '_blank');
 }
 
 async function submitToProteinSol(seq) {
@@ -821,6 +861,7 @@ function clearAll() {
   document.getElementById('results').classList.add('hidden');
   document.getElementById('finalRecSection').classList.add('hidden');
   document.getElementById('ccSolSection').classList.add('hidden');
+  document.getElementById('netSolPSection').classList.add('hidden');
   _recState.ps = null; _recState.cc = null; _recState.local = null;
 }
 
