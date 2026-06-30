@@ -119,6 +119,28 @@
       <div id="recommendations" class="p-6 space-y-2 text-sm text-gray-700"></div>
     </div>
 
+    <!-- Final Recommendation -->
+    <div id="finalRecSection" class="hidden rounded-lg border-2 border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">綜合建議</h2>
+        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics 三項預測結果</p>
+      </div>
+      <div class="p-6">
+        <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
+          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          等待外部工具計算中…
+        </div>
+        <div id="finalRecResult" class="hidden">
+          <div id="finalVerdict" class="text-xl font-bold mb-4"></div>
+          <div id="finalBreakdown"></div>
+          <div id="finalSuggestion"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Protein-Sol Integration -->
     <div id="proteinSolSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
@@ -549,18 +571,14 @@ function analyze() {
 
   document.getElementById('results').classList.remove('hidden');
 
+  // ── Final Recommendation (init) ──────────────────────────────────────────
+  initRecState(rScore, tmRegions.length > 0, gravy, inst, cys);
+
   // ── Protein-Sol ─────────────────────────────────────────────────────────
   const psSection = document.getElementById('proteinSolSection');
   psSection.classList.remove('hidden');
   ['psLoading','psResult','psError','psNoWorker'].forEach(id =>
     document.getElementById(id).classList.add('hidden'));
-
-  if (!WORKER_URL) {
-    document.getElementById('psNoWorker').classList.remove('hidden');
-  } else {
-    document.getElementById('psLoading').classList.remove('hidden');
-    submitToProteinSol(seq);
-  }
 
   // ── ccSOL omics ──────────────────────────────────────────────────────────
   const ccSection = document.getElementById('ccSolSection');
@@ -568,16 +586,23 @@ function analyze() {
   ['ccLoading','ccResult','ccError'].forEach(id =>
     document.getElementById(id).classList.add('hidden'));
 
-  if (WORKER_URL) {
-    document.getElementById('ccLoading').classList.remove('hidden');
-    submitToCcSOL(seq);
-  } else {
+  if (!WORKER_URL) {
+    document.getElementById('psNoWorker').classList.remove('hidden');
     document.getElementById('ccError').classList.remove('hidden');
     document.getElementById('ccError').textContent = '尚未設定 Cloudflare Worker，無法呼叫 ccSOL omics。';
+    _recState.ps = false;
+    _recState.cc = false;
+    tryShowFinalRec();
+  } else {
+    document.getElementById('psLoading').classList.remove('hidden');
+    submitToProteinSol(seq);
+    document.getElementById('ccLoading').classList.remove('hidden');
+    submitToCcSOL(seq);
   }
 }
 
 let _lastSeq = '';
+const _recState = { ps: null, cc: null, local: null };
 
 function copyAndOpenPS() {
   navigator.clipboard.writeText(_lastSeq).then(() => {
@@ -612,6 +637,9 @@ async function submitToProteinSol(seq) {
     }
     if (score === null) throw new Error('計算逾時，請點上方連結直接查看 Protein-Sol 結果');
 
+    _recState.ps = score;
+    tryShowFinalRec();
+
     // Render
     document.getElementById('psLoading').classList.add('hidden');
     document.getElementById('psResult').classList.remove('hidden');
@@ -637,6 +665,8 @@ async function submitToProteinSol(seq) {
       : `分數 ${score.toFixed(3)} 低於 E. coli 平均值（0.45），預測可溶性偏低，inclusion body 風險高。`;
 
   } catch (e) {
+    _recState.ps = false;
+    tryShowFinalRec();
     document.getElementById('psLoading').classList.add('hidden');
     document.getElementById('psError').classList.remove('hidden');
     document.getElementById('psError').textContent = `Protein-Sol 錯誤：${e.message}`;
@@ -662,6 +692,9 @@ async function submitToCcSOL(seq) {
       if (data.ready) { score = data.score; reliability = data.reliability; break; }
     }
     if (score === null) throw new Error('計算逾時，請直接前往 ccSOL omics 查看結果');
+
+    _recState.cc = score;
+    tryShowFinalRec();
 
     document.getElementById('ccLoading').classList.add('hidden');
     document.getElementById('ccResult').classList.remove('hidden');
@@ -691,17 +724,104 @@ async function submitToCcSOL(seq) {
       : `可溶性傾向 ${score}%，低於 40%，inclusion body 形成風險高，建議重新設計或使用可溶性融合標籤。`;
 
   } catch (e) {
+    _recState.cc = false;
+    tryShowFinalRec();
     document.getElementById('ccLoading').classList.add('hidden');
     document.getElementById('ccError').classList.remove('hidden');
     document.getElementById('ccError').textContent = `ccSOL 錯誤：${e.message}`;
   }
 }
 
+function initRecState(rScore, hasTM, gravy, inst, cys) {
+  _recState.ps = null;
+  _recState.cc = null;
+  _recState.local = { rScore, hasTM, gravy, inst, cys };
+  const sec = document.getElementById('finalRecSection');
+  sec.className = 'rounded-lg border-2 border-gray-200 bg-white shadow-sm';
+  sec.classList.remove('hidden');
+  document.getElementById('finalRecLoading').classList.remove('hidden');
+  document.getElementById('finalRecResult').classList.add('hidden');
+}
+
+function tryShowFinalRec() {
+  if (_recState.ps === null || _recState.cc === null) return;
+  document.getElementById('finalRecLoading').classList.add('hidden');
+  document.getElementById('finalRecResult').classList.remove('hidden');
+
+  const { rScore, hasTM, gravy, inst, cys } = _recState.local;
+  const localLevel = rScore === 0 ? 'high' : rScore <= 2 ? 'medium' : 'low';
+  const psLevel = _recState.ps === false ? null
+    : _recState.ps >= 0.55 ? 'high' : _recState.ps >= 0.45 ? 'medium' : 'low';
+  const ccLevel = _recState.cc === false ? null
+    : _recState.cc >= 60 ? 'high' : _recState.cc >= 40 ? 'medium' : 'low';
+
+  const judges = [
+    { name: '本地計算', level: localLevel, detail: `評分 ${rScore}/8` },
+    ...(psLevel !== null ? [{ name: 'Protein-Sol', level: psLevel, detail: _recState.ps.toFixed(3) }] : []),
+    ...(ccLevel !== null ? [{ name: 'ccSOL omics', level: ccLevel, detail: `${_recState.cc}%` }] : []),
+  ];
+  const highCount = judges.filter(j => j.level === 'high').length;
+  const total = judges.length;
+
+  let verdictText, verdictColor, borderColor;
+  if (hasTM) {
+    verdictText = '⚠️ 含跨膜域 — E. coli 細胞質可溶性表現困難';
+    verdictColor = 'text-orange-700'; borderColor = 'border-orange-300';
+  } else if (highCount === total) {
+    verdictText = '✅ 高信心：三項預測一致認為可溶';
+    verdictColor = 'text-green-700'; borderColor = 'border-green-400';
+  } else if (highCount >= 2) {
+    verdictText = '✅ 預測可溶（多數工具支持）';
+    verdictColor = 'text-green-600'; borderColor = 'border-green-300';
+  } else if (highCount >= 1) {
+    verdictText = '⚠️ 可溶性不確定，建議優化條件';
+    verdictColor = 'text-yellow-700'; borderColor = 'border-yellow-300';
+  } else {
+    verdictText = '❌ 多數工具預測不可溶，建議調整策略';
+    verdictColor = 'text-red-700'; borderColor = 'border-red-300';
+  }
+
+  document.getElementById('finalRecSection').className =
+    `rounded-lg border-2 ${borderColor} bg-white shadow-sm`;
+
+  const iconMap = { high: '✅', medium: '⚠️', low: '❌' };
+  const labelMap = { high: '預測可溶', medium: '中等', low: '預測不可溶' };
+  const tableRows = judges.map(j =>
+    `<tr>
+      <td class="py-1 pr-6 text-sm text-gray-500 w-28">${j.name}</td>
+      <td class="py-1 text-sm">${iconMap[j.level]} ${labelMap[j.level]}</td>
+      <td class="py-1 pl-4 text-xs text-gray-400 font-mono">${j.detail}</td>
+    </tr>`
+  ).join('');
+
+  const tips = [];
+  if (hasTM) tips.push('截去跨膜域只表現胞外可溶區段，或改用真核 / 昆蟲細胞系統');
+  if (_recState.ps !== false && _recState.ps < 0.45)
+    tips.push('Protein-Sol 低於 E. coli 平均值（0.45），考慮添加 MBP 或 SUMO 融合標籤');
+  if (_recState.cc !== false && _recState.cc < 40)
+    tips.push('ccSOL omics 低於 40%，嘗試低溫誘導（16–20°C）或 auto-induction 培養基');
+  if (cys > 4)
+    tips.push(`Cys=${cys}（${Math.floor(cys/2)} 對），建議使用 SHuffle T7 菌株或 periplasm 表現`);
+  if (inst >= 40)
+    tips.push(`不穩定指數 ${inst.toFixed(1)} > 40，考慮 thioredoxin 融合標籤提升穩定性`);
+
+  document.getElementById('finalVerdict').innerHTML =
+    `<span class="${verdictColor}">${verdictText}</span>`;
+  document.getElementById('finalBreakdown').innerHTML =
+    `<table class="w-full my-3">${tableRows}</table>`;
+  document.getElementById('finalSuggestion').innerHTML = tips.length > 0
+    ? `<div class="text-xs font-medium text-gray-500 mb-2 border-t border-gray-100 pt-3">建議措施：</div>
+       <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">${tips.map(t => `<li>${t}</li>`).join('')}</ul>`
+    : '';
+}
+
 function clearAll() {
   document.getElementById('seqInput').value = '';
   document.getElementById('seqLen').textContent = '';
   document.getElementById('results').classList.add('hidden');
+  document.getElementById('finalRecSection').classList.add('hidden');
   document.getElementById('ccSolSection').classList.add('hidden');
+  _recState.ps = null; _recState.cc = null; _recState.local = null;
 }
 
 document.getElementById('seqInput').addEventListener('input', function() {
