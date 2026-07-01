@@ -76,6 +76,28 @@
   <!-- Results (hidden initially) -->
   <div id="results" class="hidden space-y-6">
 
+    <!-- Final Recommendation -->
+    <div id="finalRecSection" class="hidden rounded-lg border-2 border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-gray-900">綜合建議</h2>
+        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics 三項自動預測結果（NetSolP 需手動查詢）</p>
+      </div>
+      <div class="p-6">
+        <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
+          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          等待外部工具計算中…
+        </div>
+        <div id="finalRecResult" class="hidden">
+          <div id="finalVerdict" class="text-xl font-bold mb-4"></div>
+          <div id="finalBreakdown"></div>
+          <div id="finalSuggestion"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Properties Table -->
     <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 px-6 py-4">
@@ -117,28 +139,6 @@
         <h2 class="text-base font-semibold text-gray-900">建議表現策略</h2>
       </div>
       <div id="recommendations" class="p-6 space-y-2 text-sm text-gray-700"></div>
-    </div>
-
-    <!-- Final Recommendation -->
-    <div id="finalRecSection" class="hidden rounded-lg border-2 border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4">
-        <h2 class="text-base font-semibold text-gray-900">綜合建議</h2>
-        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics 三項自動預測結果（NetSolP 需手動查詢）</p>
-      </div>
-      <div class="p-6">
-        <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
-          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-          </svg>
-          等待外部工具計算中…
-        </div>
-        <div id="finalRecResult" class="hidden">
-          <div id="finalVerdict" class="text-xl font-bold mb-4"></div>
-          <div id="finalBreakdown"></div>
-          <div id="finalSuggestion"></div>
-        </div>
-      </div>
     </div>
 
     <!-- Protein-Sol Integration -->
