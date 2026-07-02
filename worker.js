@@ -132,6 +132,32 @@ export default {
       }
     }
 
+    // ── POST /submit-soluprot ─────────────────────────────────────────────
+    if (request.method === 'POST' && url.pathname === '/submit-soluprot') {
+      let sequence;
+      try {
+        ({ sequence } = await request.json());
+      } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+      }
+      if (!sequence) return json({ error: 'Missing sequence' }, 400);
+
+      const formBody = new URLSearchParams({ fasta: `>query\n${sequence}` });
+      try {
+        const resp = await fetch('https://loschmidt.chemi.muni.cz/soluprot/', {
+          method: 'POST',
+          body: formBody.toString(),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        const html = await resp.text();
+        const match = html.match(/<td[^>]*text-align:center[^>]*>([\d.]+)<\/td>/);
+        if (!match) return json({ error: 'SoluProt did not return a score' }, 502);
+        return json({ score: parseFloat(match[1]) });
+      } catch (e) {
+        return json({ error: e.message }, 502);
+      }
+    }
+
     return new Response('Not found', { status: 404, headers: CORS });
   },
 };

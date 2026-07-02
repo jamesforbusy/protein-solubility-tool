@@ -80,7 +80,7 @@
     <div id="finalRecSection" class="hidden rounded-lg border-2 border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 px-6 py-4">
         <h2 class="text-base font-semibold text-gray-900">綜合建議</h2>
-        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics 三項自動預測結果（NetSolP 需手動查詢）</p>
+        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・ccSOL omics・SoluProt 四項自動預測結果（NetSolP 需手動查詢）</p>
       </div>
       <div class="p-6">
         <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
@@ -252,6 +252,53 @@
 
         <!-- Error -->
         <div id="ccError" class="hidden text-sm text-red-600 p-3 rounded-md bg-red-50"></div>
+
+      </div>
+    </div>
+
+    <!-- SoluProt Integration -->
+    <div id="soluprotSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900">SoluProt 外部預測</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Brno · 隨機森林 · 36 個序列特徵 · E. coli 表現資料庫訓練</p>
+        </div>
+        <a href="https://loschmidt.chemi.muni.cz/soluprot/" target="_blank"
+           class="text-xs text-blue-500 hover:underline">在 SoluProt 查看完整報告 ↗</a>
+      </div>
+      <div class="p-6">
+
+        <!-- Loading -->
+        <div id="spLoading" class="hidden flex items-center gap-3 text-sm text-gray-500">
+          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          正在提交到 SoluProt 計算中（約 5–15 秒）…
+        </div>
+
+        <!-- Result -->
+        <div id="spResult" class="hidden">
+          <div class="flex items-end gap-4 mb-4">
+            <div>
+              <div class="text-xs text-gray-400 mb-1">預測可溶性分數</div>
+              <div id="spScore" class="text-4xl font-bold text-gray-900"></div>
+              <div class="text-xs text-gray-400 mt-0.5">0–1 scale（閾值 0.50）</div>
+            </div>
+            <div id="spBadge" class="mb-1"></div>
+          </div>
+          <div class="relative h-3 rounded-full bg-gray-100 mb-1">
+            <div id="spBar" class="absolute top-0 left-0 h-full rounded-full transition-all duration-700"></div>
+            <div class="absolute top-0 h-full w-px bg-gray-400 opacity-50" style="left:50%"></div>
+          </div>
+          <div class="flex justify-between text-xs text-gray-400 mb-4">
+            <span>0 不可溶</span><span>閾值 0.50</span><span>1 高度可溶</span>
+          </div>
+          <p id="spInterpret" class="text-sm text-gray-600 p-3 rounded-md bg-gray-50"></p>
+        </div>
+
+        <!-- Error -->
+        <div id="spError" class="hidden text-sm text-red-600 p-3 rounded-md bg-red-50"></div>
 
       </div>
     </div>
@@ -612,18 +659,29 @@ function analyze() {
   ['ccLoading','ccResult','ccError'].forEach(id =>
     document.getElementById(id).classList.add('hidden'));
 
+  // ── SoluProt ─────────────────────────────────────────────────────────────
+  const spSection = document.getElementById('soluprotSection');
+  spSection.classList.remove('hidden');
+  ['spLoading','spResult','spError'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+
   if (!WORKER_URL) {
     document.getElementById('psNoWorker').classList.remove('hidden');
     document.getElementById('ccError').classList.remove('hidden');
     document.getElementById('ccError').textContent = '尚未設定 Cloudflare Worker，無法呼叫 ccSOL omics。';
+    document.getElementById('spError').classList.remove('hidden');
+    document.getElementById('spError').textContent = '尚未設定 Cloudflare Worker，無法呼叫 SoluProt。';
     _recState.ps = false;
     _recState.cc = false;
+    _recState.sp = false;
     tryShowFinalRec();
   } else {
     document.getElementById('psLoading').classList.remove('hidden');
     submitToProteinSol(seq);
     document.getElementById('ccLoading').classList.remove('hidden');
     submitToCcSOL(seq);
+    document.getElementById('spLoading').classList.remove('hidden');
+    submitToSoluProt(seq);
   }
 
   // ── NetSolP (manual) ─────────────────────────────────────────────────────
@@ -632,7 +690,7 @@ function analyze() {
 }
 
 let _lastSeq = '';
-const _recState = { ps: null, cc: null, local: null };
+const _recState = { ps: null, cc: null, sp: null, local: null };
 
 function copyAndOpenPS() {
   navigator.clipboard.writeText(_lastSeq).then(() => {
@@ -772,9 +830,54 @@ async function submitToCcSOL(seq) {
   }
 }
 
+async function submitToSoluProt(seq) {
+  try {
+    const resp = await fetch(`${WORKER_URL}/submit-soluprot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sequence: seq }),
+    });
+    const { score, error: err } = await resp.json();
+    if (err) throw new Error(err);
+
+    _recState.sp = score;
+    tryShowFinalRec();
+
+    document.getElementById('spLoading').classList.add('hidden');
+    document.getElementById('spResult').classList.remove('hidden');
+    document.getElementById('spScore').textContent = score.toFixed(3);
+
+    const bar = document.getElementById('spBar');
+    bar.style.width = `${Math.min(score * 100, 100)}%`;
+    bar.className = `absolute top-0 left-0 h-full rounded-full transition-all duration-700 ${
+      score >= 0.60 ? 'bg-green-400' : score >= 0.45 ? 'bg-yellow-400' : 'bg-red-400'
+    }`;
+
+    document.getElementById('spBadge').innerHTML = score >= 0.60
+      ? '<span class="badge-green inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">高可溶性</span>'
+      : score >= 0.45
+      ? '<span class="badge-yellow inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">中等</span>'
+      : '<span class="badge-red inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">低可溶性</span>';
+
+    document.getElementById('spInterpret').textContent = score >= 0.60
+      ? `分數 ${score.toFixed(3)} 高於閾值（0.50），預測在 E. coli 中可溶性良好。`
+      : score >= 0.45
+      ? `分數 ${score.toFixed(3)} 接近閾值（0.50），可溶性中等，建議優化表現條件。`
+      : `分數 ${score.toFixed(3)} 低於閾值（0.50），預測可溶性偏低，inclusion body 風險高。`;
+
+  } catch (e) {
+    _recState.sp = false;
+    tryShowFinalRec();
+    document.getElementById('spLoading').classList.add('hidden');
+    document.getElementById('spError').classList.remove('hidden');
+    document.getElementById('spError').textContent = `SoluProt 錯誤：${e.message}`;
+  }
+}
+
 function initRecState(rScore, hasTM, gravy, inst, cys) {
   _recState.ps = null;
   _recState.cc = null;
+  _recState.sp = null;
   _recState.local = { rScore, hasTM, gravy, inst, cys };
   const sec = document.getElementById('finalRecSection');
   sec.className = 'rounded-lg border-2 border-gray-200 bg-white shadow-sm';
@@ -784,7 +887,7 @@ function initRecState(rScore, hasTM, gravy, inst, cys) {
 }
 
 function tryShowFinalRec() {
-  if (_recState.ps === null || _recState.cc === null) return;
+  if (_recState.ps === null || _recState.cc === null || _recState.sp === null) return;
   document.getElementById('finalRecLoading').classList.add('hidden');
   document.getElementById('finalRecResult').classList.remove('hidden');
 
@@ -794,11 +897,14 @@ function tryShowFinalRec() {
     : _recState.ps >= 0.55 ? 'high' : _recState.ps >= 0.45 ? 'medium' : 'low';
   const ccLevel = _recState.cc === false ? null
     : _recState.cc >= 60 ? 'high' : _recState.cc >= 40 ? 'medium' : 'low';
+  const spLevel = _recState.sp === false ? null
+    : _recState.sp >= 0.60 ? 'high' : _recState.sp >= 0.45 ? 'medium' : 'low';
 
   const judges = [
     { name: '本地計算', level: localLevel, detail: `評分 ${rScore}/8` },
     ...(psLevel !== null ? [{ name: 'Protein-Sol', level: psLevel, detail: _recState.ps.toFixed(3) }] : []),
     ...(ccLevel !== null ? [{ name: 'ccSOL omics', level: ccLevel, detail: `${_recState.cc}%` }] : []),
+    ...(spLevel !== null ? [{ name: 'SoluProt', level: spLevel, detail: _recState.sp.toFixed(3) }] : []),
   ];
   const highCount = judges.filter(j => j.level === 'high').length;
   const total = judges.length;
@@ -808,12 +914,12 @@ function tryShowFinalRec() {
     verdictText = '⚠️ 含跨膜域 — E. coli 細胞質可溶性表現困難';
     verdictColor = 'text-orange-700'; borderColor = 'border-orange-300';
   } else if (highCount === total) {
-    verdictText = '✅ 高信心：三項預測一致認為可溶';
+    verdictText = `✅ 高信心：全部 ${total} 項預測一致認為可溶`;
     verdictColor = 'text-green-700'; borderColor = 'border-green-400';
-  } else if (highCount >= 2) {
+  } else if (highCount >= Math.ceil(total * 0.75)) {
     verdictText = '✅ 預測可溶（多數工具支持）';
     verdictColor = 'text-green-600'; borderColor = 'border-green-300';
-  } else if (highCount >= 1) {
+  } else if (highCount > 0) {
     verdictText = '⚠️ 可溶性不確定，建議優化條件';
     verdictColor = 'text-yellow-700'; borderColor = 'border-yellow-300';
   } else {
@@ -840,6 +946,8 @@ function tryShowFinalRec() {
     tips.push('Protein-Sol 低於 E. coli 平均值（0.45），考慮添加 MBP 或 SUMO 融合標籤');
   if (_recState.cc !== false && _recState.cc < 40)
     tips.push('ccSOL omics 低於 40%，嘗試低溫誘導（16–20°C）或 auto-induction 培養基');
+  if (_recState.sp !== false && _recState.sp < 0.50)
+    tips.push(`SoluProt 分數 ${_recState.sp.toFixed(3)} 低於閾值（0.50），建議添加可溶性融合標籤（MBP、SUMO）`);
   if (cys > 4)
     tips.push(`Cys=${cys}（${Math.floor(cys/2)} 對），建議使用 SHuffle T7 菌株或 periplasm 表現`);
   if (inst >= 40)
@@ -861,8 +969,9 @@ function clearAll() {
   document.getElementById('results').classList.add('hidden');
   document.getElementById('finalRecSection').classList.add('hidden');
   document.getElementById('ccSolSection').classList.add('hidden');
+  document.getElementById('soluprotSection').classList.add('hidden');
   document.getElementById('netSolPSection').classList.add('hidden');
-  _recState.ps = null; _recState.cc = null; _recState.local = null;
+  _recState.ps = null; _recState.cc = null; _recState.sp = null; _recState.local = null;
 }
 
 document.getElementById('seqInput').addEventListener('input', function() {
