@@ -72,66 +72,6 @@ export default {
       }
     }
 
-    // ── POST /submit-ccsol ────────────────────────────────────────────────
-    if (request.method === 'POST' && url.pathname === '/submit-ccsol') {
-      let sequence;
-      try {
-        ({ sequence } = await request.json());
-      } catch {
-        return json({ error: 'Invalid JSON body' }, 400);
-      }
-      if (!sequence) return json({ error: 'Missing sequence' }, 400);
-
-      const attributes = JSON.stringify({
-        email: 'user@example.com',
-        algorithm: 'ccsol_omics',
-        submission_title: 'query',
-        type_algorithm: 'old',
-        command: 'ccsol_omics.py -text=Yes -output_dir=<output_dir>',
-        type_submit: 'text',
-        title: 'query',
-        protein_seq: `>query\n${sequence}`,
-      });
-
-      const formData = new FormData();
-      formData.append('type_submit', 'text');
-      formData.append('attributes', attributes);
-
-      try {
-        const resp = await fetch('https://tools.tartaglialab.com/form_submit', {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await resp.json();
-        if (!data.task_id) return json({ error: 'No task_id from ccSOL' }, 502);
-        const baseDir = data.url.replace(/index\.html.*/, '');
-        const tableUrl = `${baseDir}table.${data.task_id}.html`;
-        return json({ task_id: data.task_id, tableUrl });
-      } catch (e) {
-        return json({ error: e.message }, 502);
-      }
-    }
-
-    // ── GET /poll-ccsol?tableUrl=... ──────────────────────────────────────
-    if (url.pathname === '/poll-ccsol') {
-      const tableUrl = url.searchParams.get('tableUrl');
-      if (!tableUrl) return json({ error: 'Missing tableUrl' }, 400);
-
-      try {
-        const resp = await fetch(tableUrl);
-        if (!resp.ok) return json({ ready: false });
-        const html = await resp.text();
-        const tds = [...html.matchAll(/<td>(\d+)<\/td>/g)];
-        if (tds.length < 2) return json({ ready: false });
-        const score = parseInt(tds[1][1]);
-        const relMatch = html.match(/data-sort-value="(\d+)"/);
-        const reliability = relMatch ? parseInt(relMatch[1]) : null;
-        return json({ ready: true, score, reliability });
-      } catch (e) {
-        return json({ ready: false, error: e.message });
-      }
-    }
-
     // ── POST /submit-soluprot ─────────────────────────────────────────────
     if (request.method === 'POST' && url.pathname === '/submit-soluprot') {
       let sequence;
