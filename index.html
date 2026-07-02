@@ -2,298 +2,332 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>蛋白質可溶性分析工具</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <title>SolPredict — 蛋白質可溶性分析</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="SolPredict">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+
   <script>
     // 部署 Cloudflare Worker 後，將下方換成您的 Worker 網址
-    // 例如: const WORKER_URL = 'https://protein-sol-proxy.yourname.workers.dev';
     const WORKER_URL = 'https://late-band-88f6.jamesforbusy.workers.dev';
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            border: "hsl(214.3 31.8% 91.4%)",
-            input: "hsl(214.3 31.8% 91.4%)",
-            ring: "hsl(221.2 83.2% 53.3%)",
-            background: "hsl(0 0% 100%)",
-            foreground: "hsl(222.2 84% 4.9%)",
-            primary: { DEFAULT: "hsl(221.2 83.2% 53.3%)", foreground: "hsl(210 40% 98%)" },
-            muted: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(215.4 16.3% 46.9%)" },
-            card: { DEFAULT: "hsl(0 0% 100%)", foreground: "hsl(222.2 84% 4.9%)" },
-          }
-        }
-      }
-    }
-  </script>
   <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    textarea { resize: vertical; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif; }
+    textarea { resize: none; }
     .badge-green  { background: #dcfce7; color: #166534; }
     .badge-red    { background: #fee2e2; color: #991b1b; }
     .badge-yellow { background: #fef9c3; color: #854d0e; }
     .badge-blue   { background: #dbeafe; color: #1e40af; }
     .badge-gray   { background: #f3f4f6; color: #374151; }
-    .risk-row td { padding: 6px 8px; font-size: 0.875rem; }
+    .risk-row td  { padding: 6px 4px; font-size: 0.8125rem; }
+    .tab-active   { color: #2563eb; }
+    .tab-idle     { color: #9ca3af; }
+    main::-webkit-scrollbar { width: 0; }
+    /* app shell fills the viewport on mobile, phone-like column on desktop */
+    .app-shell { height: 100dvh; height: 100vh; }
   </style>
 </head>
-<body class="min-h-screen bg-gray-50 py-8">
+<body class="bg-gray-200">
 
-<div class="max-w-3xl mx-auto px-4">
+<div class="app-shell mx-auto max-w-md w-full bg-gray-50 flex flex-col shadow-2xl">
 
-  <!-- Header -->
-  <div class="mb-8">
-    <h1 class="text-2xl font-semibold tracking-tight text-gray-900">蛋白質可溶性分析</h1>
-    <p class="mt-1 text-sm text-gray-500">評估蛋白質序列在大腸桿菌（E. coli）中的可溶性表現風險</p>
-  </div>
-
-  <!-- Input Card -->
-  <div class="rounded-lg border border-gray-200 bg-white shadow-sm mb-6">
-    <div class="p-6">
-      <label class="block text-sm font-medium text-gray-700 mb-2">蛋白質序列</label>
-      <textarea
-        id="seqInput"
-        rows="5"
-        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        placeholder="貼上序列（FASTA 格式或純胺基酸序列，支援 gap 字元 -/. 會自動去除）"
-      ></textarea>
-      <div class="mt-3 flex items-center gap-3">
-        <button
-          onclick="analyze()"
-          class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-        >分析</button>
-        <button
-          onclick="clearAll()"
-          class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-        >清除</button>
-        <span id="seqLen" class="text-xs text-gray-400"></span>
+  <!-- ═══════════ App Bar ═══════════ -->
+  <header class="flex-shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 text-white px-5 pt-4 pb-3"
+          style="padding-top: max(1rem, env(safe-area-inset-top));">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-base">🧬</div>
+        <span class="font-semibold text-lg tracking-tight">SolPredict</span>
       </div>
+      <div class="text-xs bg-white/15 px-2.5 py-1 rounded-full font-medium">E. coli 可溶性</div>
     </div>
-  </div>
+  </header>
 
-  <!-- Results (hidden initially) -->
-  <div id="results" class="hidden space-y-6">
+  <!-- ═══════════ Scrollable content ═══════════ -->
+  <main class="flex-1 overflow-y-auto overscroll-contain">
 
-    <!-- Final Recommendation -->
-    <div id="finalRecSection" class="hidden rounded-lg border-2 border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4">
-        <h2 class="text-base font-semibold text-gray-900">綜合建議</h2>
-        <p class="text-xs text-gray-400 mt-0.5">整合本地計算・Protein-Sol・SoluProt 三項自動預測結果（NetSolP 需手動查詢）</p>
-      </div>
-      <div class="p-6">
-        <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
-          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-          </svg>
-          等待外部工具計算中…
-        </div>
-        <div id="finalRecResult" class="hidden">
-          <div id="finalVerdict" class="text-xl font-bold mb-4"></div>
-          <div id="finalBreakdown"></div>
-          <div id="finalSuggestion"></div>
+    <!-- ─────────── TAB: 分析 ─────────── -->
+    <section id="tab-analyze" class="px-4 py-4">
+      <h2 class="text-xl font-bold text-gray-900 mb-1">分析序列</h2>
+      <p class="text-xs text-gray-500 mb-4">評估蛋白質序列在大腸桿菌中的可溶性表現風險</p>
+
+      <!-- Input Card -->
+      <div class="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 mb-3">
+        <textarea
+          id="seqInput"
+          rows="6"
+          class="w-full text-xs font-mono text-gray-800 placeholder-gray-400 outline-none"
+          placeholder="貼上序列（FASTA 或純胺基酸序列，支援 gap 字元 -/. 自動去除）"
+        ></textarea>
+        <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+          <span id="seqLen" class="text-xs text-gray-400"></span>
+          <button onclick="loadExample()" class="text-xs text-blue-600 font-medium">載入範例</button>
         </div>
       </div>
-    </div>
-
-    <!-- Properties Table -->
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4">
-        <h2 class="text-base font-semibold text-gray-900">理化性質</h2>
+      <div class="flex gap-2 mb-6">
+        <button onclick="analyze()"
+          class="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-semibold shadow-sm active:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+          <span>⚡</span> 開始分析
+        </button>
+        <button onclick="clearAll()"
+          class="px-5 py-3 rounded-2xl border border-gray-300 bg-white text-sm font-medium text-gray-600 active:bg-gray-100 transition-colors">
+          清除
+        </button>
       </div>
-      <div class="p-6">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-gray-100">
-              <th class="pb-2 text-left font-medium text-gray-500">指標</th>
-              <th class="pb-2 text-right font-medium text-gray-500">數值</th>
-              <th class="pb-2 text-right font-medium text-gray-500">評估</th>
-            </tr>
-          </thead>
-          <tbody id="propsTable" class="divide-y divide-gray-50 text-gray-800"></tbody>
-        </table>
-      </div>
-    </div>
 
-    <!-- Risk Assessment -->
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4">
-        <h2 class="text-base font-semibold text-gray-900">大腸桿菌可溶性風險評估</h2>
-      </div>
-      <div class="p-6 space-y-4">
-        <div id="overallRisk" class="flex items-center gap-3 p-4 rounded-lg bg-gray-50"></div>
-        <div>
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">詳細因子</h3>
-          <table class="w-full">
-            <tbody id="riskTable" class="space-y-1"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      <!-- Results (hidden initially) -->
+      <div id="results" class="hidden space-y-3">
 
-    <!-- Recommendations -->
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4">
-        <h2 class="text-base font-semibold text-gray-900">建議表現策略</h2>
-      </div>
-      <div id="recommendations" class="p-6 space-y-2 text-sm text-gray-700"></div>
-    </div>
-
-    <!-- Protein-Sol Integration -->
-    <div id="proteinSolSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h2 class="text-base font-semibold text-gray-900">Protein-Sol 外部預測</h2>
-          <p class="text-xs text-gray-400 mt-0.5">University of Manchester · 35 個序列特徵 · E. coli 表現資料庫訓練</p>
-        </div>
-        <a id="proteinSolLink" href="https://protein-sol.manchester.ac.uk/" target="_blank"
-           class="text-xs text-blue-500 hover:underline">在 Protein-Sol 查看完整報告 ↗</a>
-      </div>
-      <div class="p-6">
-
-        <!-- Loading -->
-        <div id="psLoading" class="hidden flex items-center gap-3 text-sm text-gray-500">
-          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-          </svg>
-          正在提交到 Protein-Sol 計算中（約 10–20 秒）…
-        </div>
-
-        <!-- Result -->
-        <div id="psResult" class="hidden">
-          <div class="flex items-end gap-4 mb-4">
-            <div>
-              <div class="text-xs text-gray-400 mb-1">預測可溶性分數</div>
-              <div id="psScore" class="text-4xl font-bold text-gray-900"></div>
-              <div class="text-xs text-gray-400 mt-0.5">0–1 scale（E. coli 平均值 0.45）</div>
+        <!-- Final Recommendation -->
+        <div id="finalRecSection" class="hidden rounded-2xl border-2 border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">綜合建議</h3>
+            <p class="text-[11px] text-gray-400 mt-0.5">整合本地計算・Protein-Sol・SoluProt 三項自動預測（NetSolP 需手動查詢）</p>
+          </div>
+          <div class="p-4">
+            <div id="finalRecLoading" class="flex items-center gap-3 text-sm text-gray-500">
+              <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              等待外部工具計算中…
             </div>
-            <div id="psBadge" class="mb-1"></div>
+            <div id="finalRecResult" class="hidden">
+              <div id="finalVerdict" class="text-base font-bold mb-3"></div>
+              <div id="finalBreakdown"></div>
+              <div id="finalSuggestion"></div>
+            </div>
           </div>
-          <div class="relative h-3 rounded-full bg-gray-100 mb-1">
-            <div id="psBar" class="absolute top-0 left-0 h-full rounded-full transition-all duration-700"></div>
-            <div class="absolute top-0 h-full w-px bg-gray-400 opacity-50" style="left:45%"></div>
-          </div>
-          <div class="flex justify-between text-xs text-gray-400 mb-4">
-            <span>0 不可溶</span><span>E. coli 平均 0.45</span><span>1 高度可溶</span>
-          </div>
-          <p id="psInterpret" class="text-sm text-gray-600 p-3 rounded-md bg-gray-50"></p>
         </div>
 
-        <!-- Error -->
-        <div id="psError" class="hidden text-sm text-red-600 p-3 rounded-md bg-red-50"></div>
+        <!-- Properties Table -->
+        <div class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">理化性質</h3>
+          </div>
+          <div class="p-4">
+            <table class="w-full text-sm">
+              <tbody id="propsTable" class="divide-y divide-gray-50 text-gray-800"></tbody>
+            </table>
+          </div>
+        </div>
 
-        <!-- No Worker configured -->
-        <div id="psNoWorker" class="hidden">
-          <p class="text-sm text-gray-600 mb-3">尚未設定 Cloudflare Worker，請依下列步驟啟用（約 5 分鐘）：</p>
-          <ol class="space-y-1.5 text-xs text-gray-500 list-decimal list-inside mb-4">
-            <li>前往 <a href="https://dash.cloudflare.com" target="_blank" class="text-blue-500 hover:underline">dash.cloudflare.com</a> 建立免費帳號</li>
-            <li>Workers &amp; Pages → Create Worker → 將 <code class="bg-gray-100 px-1 rounded">worker.js</code> 內容貼上 → Deploy</li>
-            <li>複製 Worker 網址（例如 <code class="bg-gray-100 px-1 rounded">https://protein-sol-proxy.yourname.workers.dev</code>）</li>
-            <li>將 <code class="bg-gray-100 px-1 rounded">index.html</code> 第 8 行的 <code class="bg-gray-100 px-1 rounded">WORKER_URL</code> 換成該網址後重新 push</li>
-          </ol>
-          <div class="border-t border-gray-100 pt-3 flex items-center gap-3">
-            <button onclick="copyAndOpenPS()"
-              class="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
-              複製序列並手動前往 Protein-Sol ↗
+        <!-- Risk Assessment -->
+        <div class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">大腸桿菌可溶性風險評估</h3>
+          </div>
+          <div class="p-4 space-y-4">
+            <div id="overallRisk" class="flex items-center gap-3 p-3 rounded-xl bg-gray-50"></div>
+            <div>
+              <h4 class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">詳細因子</h4>
+              <table class="w-full"><tbody id="riskTable"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">建議表現策略</h3>
+          </div>
+          <div id="recommendations" class="p-4 space-y-2.5 text-sm text-gray-700"></div>
+        </div>
+
+        <!-- Protein-Sol -->
+        <div id="proteinSolSection" class="hidden rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">Protein-Sol</h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">Manchester · 35 特徵</p>
+            </div>
+            <a id="proteinSolLink" href="https://protein-sol.manchester.ac.uk/" target="_blank"
+               class="text-[11px] text-blue-500">完整報告 ↗</a>
+          </div>
+          <div class="p-4">
+            <div id="psLoading" class="hidden flex items-center gap-3 text-sm text-gray-500">
+              <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              提交到 Protein-Sol 計算中（約 10–20 秒）…
+            </div>
+            <div id="psResult" class="hidden">
+              <div class="flex items-end gap-3 mb-3">
+                <div>
+                  <div class="text-[11px] text-gray-400 mb-0.5">預測可溶性分數</div>
+                  <div id="psScore" class="text-3xl font-bold text-gray-900"></div>
+                </div>
+                <div id="psBadge" class="mb-1"></div>
+              </div>
+              <div class="relative h-2.5 rounded-full bg-gray-100 mb-1">
+                <div id="psBar" class="absolute top-0 left-0 h-full rounded-full transition-all duration-700"></div>
+                <div class="absolute top-0 h-full w-px bg-gray-400 opacity-50" style="left:45%"></div>
+              </div>
+              <div class="flex justify-between text-[10px] text-gray-400 mb-3">
+                <span>0 不可溶</span><span>平均 0.45</span><span>1 高度可溶</span>
+              </div>
+              <p id="psInterpret" class="text-xs text-gray-600 p-3 rounded-xl bg-gray-50"></p>
+            </div>
+            <div id="psError" class="hidden text-xs text-red-600 p-3 rounded-xl bg-red-50"></div>
+            <div id="psNoWorker" class="hidden">
+              <p class="text-xs text-gray-600 mb-3">尚未設定 Cloudflare Worker，無法自動呼叫。</p>
+              <button onclick="copyAndOpenPS()"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
+                複製序列並手動前往 Protein-Sol ↗
+              </button>
+              <span id="copyDoneMsg" class="hidden text-xs text-green-600 ml-2">✓ 已複製</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SoluProt -->
+        <div id="soluprotSection" class="hidden rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">SoluProt</h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">Brno · 隨機森林 · 36 特徵</p>
+            </div>
+            <a href="https://loschmidt.chemi.muni.cz/soluprot/" target="_blank"
+               class="text-[11px] text-blue-500">完整報告 ↗</a>
+          </div>
+          <div class="p-4">
+            <div id="spLoading" class="hidden flex items-center gap-3 text-sm text-gray-500">
+              <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              提交到 SoluProt 計算中（約 5–15 秒）…
+            </div>
+            <div id="spResult" class="hidden">
+              <div class="flex items-end gap-3 mb-3">
+                <div>
+                  <div class="text-[11px] text-gray-400 mb-0.5">預測可溶性分數</div>
+                  <div id="spScore" class="text-3xl font-bold text-gray-900"></div>
+                </div>
+                <div id="spBadge" class="mb-1"></div>
+              </div>
+              <div class="relative h-2.5 rounded-full bg-gray-100 mb-1">
+                <div id="spBar" class="absolute top-0 left-0 h-full rounded-full transition-all duration-700"></div>
+                <div class="absolute top-0 h-full w-px bg-gray-400 opacity-50" style="left:50%"></div>
+              </div>
+              <div class="flex justify-between text-[10px] text-gray-400 mb-3">
+                <span>0 不可溶</span><span>閾值 0.50</span><span>1 高度可溶</span>
+              </div>
+              <p id="spInterpret" class="text-xs text-gray-600 p-3 rounded-xl bg-gray-50"></p>
+            </div>
+            <div id="spError" class="hidden text-xs text-red-600 p-3 rounded-xl bg-red-50"></div>
+          </div>
+        </div>
+
+        <!-- NetSolP Manual -->
+        <div id="netSolPSection" class="hidden rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">NetSolP <span class="text-[10px] text-amber-600 font-normal">手動</span></h3>
+              <p class="text-[11px] text-gray-400 mt-0.5">DTU · ESM1b · AUC 0.760</p>
+            </div>
+            <a href="https://services.healthtech.dtu.dk/services/NetSolP-1.0/" target="_blank"
+               class="text-[11px] text-blue-500">前往 ↗</a>
+          </div>
+          <div class="p-4">
+            <p class="text-xs text-gray-600 mb-3">蛋白質語言模型（ESM1b，6.5 億參數），獨立驗證集表現最佳。DTU 伺服器佇列較長（2–5 分鐘），故需手動查詢。</p>
+            <button onclick="copyAndOpenNetSolP()"
+              class="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-medium active:bg-blue-700 transition-colors">
+              複製序列並開啟 NetSolP ↗
             </button>
-            <a href="https://www-cohsoftware.ch.cam.ac.uk/index.php/camsolph" target="_blank"
-              class="text-xs text-blue-500 hover:underline">或前往 CamSol ↗</a>
-            <span id="copyDoneMsg" class="hidden text-xs text-green-600">✓ 已複製</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- SoluProt Integration -->
-    <div id="soluprotSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h2 class="text-base font-semibold text-gray-900">SoluProt 外部預測</h2>
-          <p class="text-xs text-gray-400 mt-0.5">Brno · 隨機森林 · 36 個序列特徵 · E. coli 表現資料庫訓練</p>
-        </div>
-        <a href="https://loschmidt.chemi.muni.cz/soluprot/" target="_blank"
-           class="text-xs text-blue-500 hover:underline">在 SoluProt 查看完整報告 ↗</a>
-      </div>
-      <div class="p-6">
-
-        <!-- Loading -->
-        <div id="spLoading" class="hidden flex items-center gap-3 text-sm text-gray-500">
-          <svg class="animate-spin h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-          </svg>
-          正在提交到 SoluProt 計算中（約 5–15 秒）…
-        </div>
-
-        <!-- Result -->
-        <div id="spResult" class="hidden">
-          <div class="flex items-end gap-4 mb-4">
-            <div>
-              <div class="text-xs text-gray-400 mb-1">預測可溶性分數</div>
-              <div id="spScore" class="text-4xl font-bold text-gray-900"></div>
-              <div class="text-xs text-gray-400 mt-0.5">0–1 scale（閾值 0.50）</div>
+            <div class="flex items-center justify-between mt-2">
+              <span class="text-[10px] text-gray-400">選 Distilled 模型，速度較快</span>
+              <span id="netSolPCopyMsg" class="hidden text-[10px] text-green-600">✓ 已複製到剪貼簿</span>
             </div>
-            <div id="spBadge" class="mb-1"></div>
           </div>
-          <div class="relative h-3 rounded-full bg-gray-100 mb-1">
-            <div id="spBar" class="absolute top-0 left-0 h-full rounded-full transition-all duration-700"></div>
-            <div class="absolute top-0 h-full w-px bg-gray-400 opacity-50" style="left:50%"></div>
+        </div>
+
+        <!-- TM Window Chart -->
+        <div id="tmSection" class="hidden rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">疏水性滑動窗口</h3>
+            <p class="text-[11px] text-gray-400 mt-0.5">Kyte-Doolittle window=19 · 得分 &gt;1.6 視為潛在跨膜域</p>
           </div>
-          <div class="flex justify-between text-xs text-gray-400 mb-4">
-            <span>0 不可溶</span><span>閾值 0.50</span><span>1 高度可溶</span>
+          <div class="p-4">
+            <div id="tmChart" class="overflow-x-auto"></div>
+            <div id="tmList" class="mt-3 space-y-1 text-sm"></div>
           </div>
-          <p id="spInterpret" class="text-sm text-gray-600 p-3 rounded-md bg-gray-50"></p>
         </div>
 
-        <!-- Error -->
-        <div id="spError" class="hidden text-sm text-red-600 p-3 rounded-md bg-red-50"></div>
-
       </div>
-    </div>
+    </section>
 
-    <!-- NetSolP Manual Query -->
-    <div id="netSolPSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h2 class="text-base font-semibold text-gray-900">NetSolP 手動查詢</h2>
-          <p class="text-xs text-gray-400 mt-0.5">DTU · ESM1b Transformer · AUC 0.760 · 閾值 0.69（Youden Index）</p>
+    <!-- ─────────── TAB: 歷史 ─────────── -->
+    <section id="tab-history" class="hidden px-4 py-4">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="text-xl font-bold text-gray-900">歷史紀錄</h2>
+        <button onclick="clearHistory()" class="text-xs text-red-500 font-medium">清除全部</button>
+      </div>
+      <p class="text-xs text-gray-400 mb-4">本機儲存，不上傳雲端</p>
+      <div id="historyList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- ─────────── TAB: 關於 ─────────── -->
+    <section id="tab-about" class="hidden px-4 py-4">
+      <h2 class="text-xl font-bold text-gray-900 mb-4">關於工具</h2>
+      <div class="space-y-2.5">
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">本地計算</div>
+          <div class="text-xs text-gray-500">GRAVY · pI · 不穩定指數 · Aliphatic index · Kyte-Doolittle 跨膜偵測。即時、免外部請求。</div>
         </div>
-        <a href="https://services.healthtech.dtu.dk/services/NetSolP-1.0/" target="_blank"
-           class="text-xs text-blue-500 hover:underline">前往 NetSolP ↗</a>
-      </div>
-      <div class="p-6 flex items-start gap-6">
-        <div class="flex-1 text-sm text-gray-600">
-          <p class="mb-2">NetSolP 使用蛋白質語言模型（ESM1b，6.5 億參數）預測 E. coli 可溶性，為目前獨立驗證集上表現最佳的序列型工具之一。</p>
-          <p class="text-xs text-gray-400">DTU 伺服器佇列較長（約 2–5 分鐘），故不支援自動整合，請手動查詢。</p>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">Protein-Sol</div>
+          <div class="text-xs text-gray-500">University of Manchester · 35 個序列特徵 · E. coli 細胞外表現資料庫訓練。</div>
         </div>
-        <div class="flex-shrink-0 flex flex-col gap-2">
-          <button onclick="copyAndOpenNetSolP()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 transition-colors">
-            複製序列並開啟 NetSolP ↗
-          </button>
-          <span id="netSolPCopyMsg" class="hidden text-xs text-green-600 text-center">✓ 已複製到剪貼簿</span>
-          <div class="text-xs text-gray-400 text-center">選 Distilled 模型，速度較快</div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">SoluProt</div>
+          <div class="text-xs text-gray-500">Loschmidt Lab, Brno · 隨機森林 · 36 個序列特徵 · 準確度約 80%。</div>
         </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">NetSolP <span class="text-[10px] text-amber-600">手動</span></div>
+          <div class="text-xs text-gray-500">DTU · ESM1b Transformer 語言模型 · AUC 0.760 · 閾值 0.69（Youden Index）。</div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-1">綜合建議如何判定</div>
+          <div class="text-xs text-gray-500 leading-relaxed">三項自動預測各投一票，全部一致→高信心可溶；達 75% 支持→預測可溶；至少一項→不確定；皆不支持→預測不可溶。偵測到跨膜域時直接標示表現困難。</div>
+        </div>
+        <div class="bg-blue-50 rounded-2xl border border-blue-100 p-4">
+          <div class="text-xs font-medium text-blue-800 mb-1">📲 安裝到主畫面</div>
+          <div class="text-xs text-blue-600 leading-relaxed">iOS Safari：分享 → 加入主畫面。Android Chrome：選單 → 安裝應用程式。之後即可像原生 app 一樣從主畫面開啟。</div>
+        </div>
+        <div class="text-center text-[10px] text-gray-400 pt-2 pb-1">SolPredict · 蛋白質可溶性分析 · 僅供研究參考</div>
       </div>
-    </div>
+    </section>
 
-    <!-- TM Window Chart (if detected) -->
-    <div id="tmSection" class="hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-6 py-4">
-        <h2 class="text-base font-semibold text-gray-900">疏水性滑動窗口（Kyte-Doolittle, window=19）</h2>
-        <p class="text-xs text-gray-400 mt-0.5">得分 &gt;1.6 的區段視為潛在跨膜域</p>
-      </div>
-      <div class="p-6">
-        <div id="tmChart" class="overflow-x-auto"></div>
-        <div id="tmList" class="mt-4 space-y-1 text-sm"></div>
-      </div>
-    </div>
+  </main>
 
-  </div>
+  <!-- ═══════════ Bottom Nav ═══════════ -->
+  <nav class="flex-shrink-0 flex border-t border-gray-200 bg-white"
+       style="padding-bottom: env(safe-area-inset-bottom);">
+    <button onclick="switchTab('analyze')" id="nav-analyze"
+            class="flex-1 flex flex-col items-center gap-0.5 py-2.5 tab-active">
+      <span class="text-xl">🔬</span><span class="text-[10px] font-medium">分析</span>
+    </button>
+    <button onclick="switchTab('history')" id="nav-history"
+            class="flex-1 flex flex-col items-center gap-0.5 py-2.5 tab-idle">
+      <span class="text-xl">🕐</span><span class="text-[10px] font-medium">歷史</span>
+    </button>
+    <button onclick="switchTab('about')" id="nav-about"
+            class="flex-1 flex flex-col items-center gap-0.5 py-2.5 tab-idle">
+      <span class="text-xl">ℹ️</span><span class="text-[10px] font-medium">關於</span>
+    </button>
+  </nav>
+
 </div>
 
 <script>
@@ -344,16 +378,16 @@ const PKa_neg   = { Cterm: 3.55, D: 4.05, E: 4.45, C: 9.0, Y: 10.0 };
 const PKa_cterm = { D: 4.55, E: 4.75 };
 const PKa_nterm = { A: 7.59, M: 7.0, S: 6.93, P: 8.36, T: 6.82, V: 7.44, E: 7.7 };
 
+const EXAMPLE_SEQ = ">Fc_region_IgG1_CH2-CH3\nPSVFIFPPKPKDTLMISRTPEVTCVVVDVSHEDPEVKFNWYVDGVEVHNAKTKPREEQYNSTYRVVSVLTVLHQDWLNGKEYKCKVSNKALPAPIEKTISKAKGQPREPQVYTLPPSREEMTKNQVSLTCLVKGFYPSDIAVEWESNGQPENNYKTTPPVLDSDGSFFLYSKLTVDKSRWQQGNVFSCSVMHEALHNHYTQKSLSLSPGK";
+
 // ─── Core Calculations ─────────────────────────────────────────────────────
 
 function cleanSeq(raw) {
-  const lines = raw.split('\n');
-  const seq = lines
+  return raw.split('\n')
     .filter(l => !l.startsWith('>'))
     .join('')
     .replace(/[\s\-\.]/g, '')
     .toUpperCase();
-  return seq;
 }
 
 function countAA(seq) {
@@ -365,7 +399,7 @@ function countAA(seq) {
 
 function calcMW(seq) {
   const counts = countAA(seq);
-  let mw = 18.0153; // water
+  let mw = 18.0153;
   for (const [aa, n] of Object.entries(counts)) {
     if (AA_MW[aa]) mw += n * (AA_MW[aa] - 18.0153);
   }
@@ -430,7 +464,6 @@ function calcTMWindows(seq, window = 19, threshold = 1.6) {
     for (let j = i; j < i + window; j++) s += KD[seq[j]] ?? 0;
     scores.push({ pos: i + 1, score: s / window });
   }
-  // merge regions above threshold
   const hits = scores.filter(x => x.score > threshold);
   if (!hits.length) return { scores, regions: [] };
   const regions = [];
@@ -461,7 +494,12 @@ function analyze() {
   if (!raw) return;
   const seq = cleanSeq(raw);
   if (seq.length < 5) { alert('序列太短，請確認輸入正確'); return; }
-  _lastSeq = seq;  // for manual copy-to-clipboard fallback
+  _lastSeq = seq;
+
+  // capture sequence name for history
+  const hdr = raw.split('\n').find(l => l.startsWith('>'));
+  const seqName = hdr ? (hdr.replace(/^>/, '').trim().split(/\s+/)[0] || '未命名').slice(0, 28) : '未命名';
+  _currentAnalysis = { name: seqName, len: seq.length, ps: null, sp: null, cat: null, ts: Date.now() };
 
   const counts = countAA(seq);
   const mw = calcMW(seq);
@@ -482,17 +520,17 @@ function analyze() {
     ['等電點 (pI)', pi.toFixed(2),                  badge(pi < 5 || pi > 9 ? '偏極端' : '接近中性', pi < 5 || pi > 9 ? 'yellow' : 'green')],
     ['GRAVY index', gravy.toFixed(4),               badge(gravy >= 0 ? '偏疏水' : '親水', gravy >= 0 ? 'red' : 'green')],
     ['不穩定指數',  inst.toFixed(2),                badge(inst < 40 ? '穩定' : '不穩定', inst < 40 ? 'green' : 'red')],
-    ['Cys 數量',    `${cys} 個（${Math.floor(cys/2)} 對潛在二硫鍵）`, badge(cys === 0 ? '無顧慮' : cys <= 2 ? '低' : cys <= 4 ? '中' : '高', cys === 0 ? 'green' : cys <= 2 ? 'blue' : cys <= 4 ? 'yellow' : 'red')],
-    ['帶電胺基酸',  `R=${R} K=${K} D=${D} E=${E}（淨電荷 ${net >= 0 ? '+' : ''}${net}）`, badge('—','gray')],
-    ['Aliphatic index', ali.toFixed(2),             badge(ali > 90 ? '高疏水骨架' : '正常', ali > 90 ? 'yellow' : 'green')],
-    ['跨膜區',      tmRegions.length > 0 ? `偵測到 ${tmRegions.length} 個區段` : '未偵測到', badge(tmRegions.length > 0 ? '有跨膜域' : '無跨膜域', tmRegions.length > 0 ? 'red' : 'green')],
+    ['Cys 數量',    `${cys}（${Math.floor(cys/2)} 對）`, badge(cys === 0 ? '無顧慮' : cys <= 2 ? '低' : cys <= 4 ? '中' : '高', cys === 0 ? 'green' : cys <= 2 ? 'blue' : cys <= 4 ? 'yellow' : 'red')],
+    ['帶電胺基酸',  `淨電荷 ${net >= 0 ? '+' : ''}${net}`, badge('—','gray')],
+    ['Aliphatic',   ali.toFixed(1),                 badge(ali > 90 ? '高疏水骨架' : '正常', ali > 90 ? 'yellow' : 'green')],
+    ['跨膜區',      tmRegions.length > 0 ? `${tmRegions.length} 個區段` : '未偵測', badge(tmRegions.length > 0 ? '有跨膜域' : '無', tmRegions.length > 0 ? 'red' : 'green')],
   ];
 
   document.getElementById('propsTable').innerHTML = rows.map(([name, val, b]) =>
     `<tr>
-      <td class="py-2.5 text-gray-600 font-medium w-1/3">${name}</td>
-      <td class="py-2.5 text-gray-800 font-mono text-sm w-1/2">${val}</td>
-      <td class="py-2.5 text-right">${b}</td>
+      <td class="py-2 text-gray-600 font-medium">${name}</td>
+      <td class="py-2 text-gray-800 font-mono text-xs">${val}</td>
+      <td class="py-2 text-right">${b}</td>
     </tr>`
   ).join('');
 
@@ -520,21 +558,20 @@ function analyze() {
   if (tmRegions.length === 0) goods.push('無跨膜域，可直接做胞質可溶性表現');
   if (mw <= 60000) goods.push(`分子量 ${(mw/1000).toFixed(1)} kDa，大小適合大腸桿菌表現`);
 
-  // Overall risk level
   let riskLevel, riskColor, riskText;
   const rScore = (tmRegions.length > 0 ? 3 : 0) + (cys >= 6 ? 3 : cys >= 3 ? 2 : cys > 0 ? 1 : 0) + (inst >= 40 ? 1 : 0) + (gravy >= 0.2 ? 1 : 0);
   if (rScore === 0) { riskLevel = '低風險'; riskColor = 'bg-green-50 border border-green-200 text-green-800'; riskText = '可溶性表現可行性高'; }
   else if (rScore <= 2) { riskLevel = '中等風險'; riskColor = 'bg-yellow-50 border border-yellow-200 text-yellow-800'; riskText = '需採用特定菌株或條件'; }
   else { riskLevel = '高風險'; riskColor = 'bg-red-50 border border-red-200 text-red-800'; riskText = '直接大腸桿菌表現可能失敗，建議調整策略'; }
 
-  document.getElementById('overallRisk').className = `flex items-center gap-3 p-4 rounded-lg ${riskColor}`;
+  document.getElementById('overallRisk').className = `flex items-center gap-3 p-3 rounded-xl ${riskColor}`;
   document.getElementById('overallRisk').innerHTML =
     `<div class="text-2xl">${rScore === 0 ? '✓' : rScore <= 2 ? '⚠' : '✕'}</div>
-     <div><div class="font-semibold">${riskLevel}</div><div class="text-sm mt-0.5">${riskText}</div></div>`;
+     <div><div class="font-semibold text-sm">${riskLevel}</div><div class="text-xs mt-0.5">${riskText}</div></div>`;
 
   const allFactors = [
-    ...risks.map(t => `<tr class="risk-row"><td class="text-red-500 w-5">✕</td><td>${t}</td></tr>`),
-    ...goods.map(t => `<tr class="risk-row"><td class="text-green-600 w-5">✓</td><td>${t}</td></tr>`),
+    ...risks.map(t => `<tr class="risk-row"><td class="text-red-500 align-top w-5">✕</td><td class="text-gray-700">${t}</td></tr>`),
+    ...goods.map(t => `<tr class="risk-row"><td class="text-green-600 align-top w-5">✓</td><td class="text-gray-700">${t}</td></tr>`),
   ];
   document.getElementById('riskTable').innerHTML = allFactors.join('');
 
@@ -570,9 +607,7 @@ function analyze() {
   // ── TM Section ──
   if (tmRegions.length > 0) {
     document.getElementById('tmSection').classList.remove('hidden');
-    // Mini bar chart using div widths
-    const maxScore = Math.max(...scores.map(s => s.score));
-    const step = Math.max(1, Math.floor(scores.length / 120));
+    const step = Math.max(1, Math.floor(scores.length / 100));
     const bars = scores.filter((_, i) => i % step === 0).map(({ pos, score }) => {
       const h = Math.max(0, Math.round((score / 4) * 40));
       const color = score > 1.6 ? 'bg-red-400' : score > 0.5 ? 'bg-blue-300' : 'bg-gray-200';
@@ -580,14 +615,13 @@ function analyze() {
     }).join('');
     document.getElementById('tmChart').innerHTML =
       `<div class="flex items-end gap-px" style="height:44px">${bars}</div>
-       <div class="flex justify-between text-xs text-gray-400 mt-1"><span>1</span><span>${seq.length}</span></div>`;
+       <div class="flex justify-between text-[10px] text-gray-400 mt-1"><span>1</span><span>${seq.length}</span></div>`;
 
     document.getElementById('tmList').innerHTML = tmRegions.map(r =>
-      `<div class="flex items-start gap-2 p-2 rounded-md bg-red-50 text-red-800 text-sm">
-        <span class="font-mono font-medium">位置 ${r.start}–${r.end}</span>
-        <span class="text-red-400">|</span>
-        <span class="font-mono text-xs">${r.seq}</span>
-        <span class="ml-auto text-xs text-red-500">峰值 ${r.peak.toFixed(2)}</span>
+      `<div class="flex items-center gap-2 p-2 rounded-lg bg-red-50 text-red-800 text-xs">
+        <span class="font-mono font-medium">${r.start}–${r.end}</span>
+        <span class="font-mono text-[10px] truncate">${r.seq}</span>
+        <span class="ml-auto flex-shrink-0 text-red-500">峰值 ${r.peak.toFixed(2)}</span>
       </div>`
     ).join('');
   } else {
@@ -596,20 +630,15 @@ function analyze() {
 
   document.getElementById('results').classList.remove('hidden');
 
-  // ── Final Recommendation (init) ──────────────────────────────────────────
   initRecState(rScore, tmRegions.length > 0, gravy, inst, cys);
 
-  // ── Protein-Sol ─────────────────────────────────────────────────────────
   const psSection = document.getElementById('proteinSolSection');
   psSection.classList.remove('hidden');
-  ['psLoading','psResult','psError','psNoWorker'].forEach(id =>
-    document.getElementById(id).classList.add('hidden'));
+  ['psLoading','psResult','psError','psNoWorker'].forEach(id => document.getElementById(id).classList.add('hidden'));
 
-  // ── SoluProt ─────────────────────────────────────────────────────────────
   const spSection = document.getElementById('soluprotSection');
   spSection.classList.remove('hidden');
-  ['spLoading','spResult','spError'].forEach(id =>
-    document.getElementById(id).classList.add('hidden'));
+  ['spLoading','spResult','spError'].forEach(id => document.getElementById(id).classList.add('hidden'));
 
   if (!WORKER_URL) {
     document.getElementById('psNoWorker').classList.remove('hidden');
@@ -625,13 +654,21 @@ function analyze() {
     submitToSoluProt(seq);
   }
 
-  // ── NetSolP (manual) ─────────────────────────────────────────────────────
   document.getElementById('netSolPSection').classList.remove('hidden');
   document.getElementById('netSolPCopyMsg').classList.add('hidden');
+
+  // scroll results into view
+  setTimeout(() => document.getElementById('finalRecSection').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 }
 
 let _lastSeq = '';
+let _currentAnalysis = null;
 const _recState = { ps: null, sp: null, local: null };
+
+function loadExample() {
+  document.getElementById('seqInput').value = EXAMPLE_SEQ;
+  document.getElementById('seqInput').dispatchEvent(new Event('input'));
+}
 
 function copyAndOpenPS() {
   navigator.clipboard.writeText(_lastSeq).then(() => {
@@ -654,7 +691,6 @@ function copyAndOpenNetSolP() {
 
 async function submitToProteinSol(seq) {
   try {
-    // Step 1: submit
     const submitResp = await fetch(`${WORKER_URL}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -666,7 +702,6 @@ async function submitToProteinSol(seq) {
     document.getElementById('proteinSolLink').href =
       `https://protein-sol.manchester.ac.uk/results/solubility/run-${jobId}/results.html`;
 
-    // Step 2: poll every 3 s, up to 12 times (36 s)
     let score = null;
     for (let i = 0; i < 12; i++) {
       await new Promise(r => setTimeout(r, 3000));
@@ -679,7 +714,6 @@ async function submitToProteinSol(seq) {
     _recState.ps = score;
     tryShowFinalRec();
 
-    // Render
     document.getElementById('psLoading').classList.add('hidden');
     document.getElementById('psResult').classList.remove('hidden');
     document.getElementById('psScore').textContent = score.toFixed(3);
@@ -690,8 +724,7 @@ async function submitToProteinSol(seq) {
       score >= 0.55 ? 'bg-green-400' : score >= 0.45 ? 'bg-yellow-400' : 'bg-red-400'
     }`;
 
-    const bdg = document.getElementById('psBadge');
-    bdg.innerHTML = score >= 0.55
+    document.getElementById('psBadge').innerHTML = score >= 0.55
       ? '<span class="badge-green inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">高可溶性</span>'
       : score >= 0.45
       ? '<span class="badge-yellow inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">中等</span>'
@@ -761,7 +794,7 @@ function initRecState(rScore, hasTM, gravy, inst, cys) {
   _recState.sp = null;
   _recState.local = { rScore, hasTM, gravy, inst, cys };
   const sec = document.getElementById('finalRecSection');
-  sec.className = 'rounded-lg border-2 border-gray-200 bg-white shadow-sm';
+  sec.className = 'rounded-2xl border-2 border-gray-200 bg-white shadow-sm overflow-hidden';
   sec.classList.remove('hidden');
   document.getElementById('finalRecLoading').classList.remove('hidden');
   document.getElementById('finalRecResult').classList.add('hidden');
@@ -787,34 +820,39 @@ function tryShowFinalRec() {
   const highCount = judges.filter(j => j.level === 'high').length;
   const total = judges.length;
 
-  let verdictText, verdictColor, borderColor;
+  let verdictText, verdictColor, borderColor, cat;
   if (hasTM) {
     verdictText = '⚠️ 含跨膜域 — E. coli 細胞質可溶性表現困難';
     verdictColor = 'text-orange-700'; borderColor = 'border-orange-300';
+    cat = { label: '跨膜', color: 'red' };
   } else if (highCount === total) {
     verdictText = `✅ 高信心：全部 ${total} 項預測一致認為可溶`;
     verdictColor = 'text-green-700'; borderColor = 'border-green-400';
+    cat = { label: '可溶', color: 'green' };
   } else if (highCount >= Math.ceil(total * 0.75)) {
     verdictText = '✅ 預測可溶（多數工具支持）';
     verdictColor = 'text-green-600'; borderColor = 'border-green-300';
+    cat = { label: '可溶', color: 'green' };
   } else if (highCount > 0) {
     verdictText = '⚠️ 可溶性不確定，建議優化條件';
     verdictColor = 'text-yellow-700'; borderColor = 'border-yellow-300';
+    cat = { label: '中等', color: 'yellow' };
   } else {
     verdictText = '❌ 多數工具預測不可溶，建議調整策略';
     verdictColor = 'text-red-700'; borderColor = 'border-red-300';
+    cat = { label: '不可溶', color: 'red' };
   }
 
   document.getElementById('finalRecSection').className =
-    `rounded-lg border-2 ${borderColor} bg-white shadow-sm`;
+    `rounded-2xl border-2 ${borderColor} bg-white shadow-sm overflow-hidden`;
 
   const iconMap = { high: '✅', medium: '⚠️', low: '❌' };
   const labelMap = { high: '預測可溶', medium: '中等', low: '預測不可溶' };
   const tableRows = judges.map(j =>
     `<tr>
-      <td class="py-1 pr-6 text-sm text-gray-500 w-28">${j.name}</td>
-      <td class="py-1 text-sm">${iconMap[j.level]} ${labelMap[j.level]}</td>
-      <td class="py-1 pl-4 text-xs text-gray-400 font-mono">${j.detail}</td>
+      <td class="py-1 pr-4 text-xs text-gray-500 whitespace-nowrap">${j.name}</td>
+      <td class="py-1 text-xs">${iconMap[j.level]} ${labelMap[j.level]}</td>
+      <td class="py-1 pl-2 text-[11px] text-gray-400 font-mono text-right">${j.detail}</td>
     </tr>`
   ).join('');
 
@@ -829,14 +867,21 @@ function tryShowFinalRec() {
   if (inst >= 40)
     tips.push(`不穩定指數 ${inst.toFixed(1)} > 40，考慮 thioredoxin 融合標籤提升穩定性`);
 
-  document.getElementById('finalVerdict').innerHTML =
-    `<span class="${verdictColor}">${verdictText}</span>`;
-  document.getElementById('finalBreakdown').innerHTML =
-    `<table class="w-full my-3">${tableRows}</table>`;
+  document.getElementById('finalVerdict').innerHTML = `<span class="${verdictColor}">${verdictText}</span>`;
+  document.getElementById('finalBreakdown').innerHTML = `<table class="w-full mb-2">${tableRows}</table>`;
   document.getElementById('finalSuggestion').innerHTML = tips.length > 0
-    ? `<div class="text-xs font-medium text-gray-500 mb-2 border-t border-gray-100 pt-3">建議措施：</div>
-       <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">${tips.map(t => `<li>${t}</li>`).join('')}</ul>`
+    ? `<div class="text-[11px] font-medium text-gray-500 mb-2 border-t border-gray-100 pt-3">建議措施：</div>
+       <ul class="text-xs text-gray-600 space-y-1 list-disc list-inside">${tips.map(t => `<li>${t}</li>`).join('')}</ul>`
     : '';
+
+  // ── save to history (runs once when both predictions resolved) ──
+  if (_currentAnalysis) {
+    _currentAnalysis.ps = _recState.ps;
+    _currentAnalysis.sp = _recState.sp;
+    _currentAnalysis.cat = cat;
+    saveHistory(_currentAnalysis);
+    _currentAnalysis = null;
+  }
 }
 
 function clearAll() {
@@ -847,7 +892,76 @@ function clearAll() {
   document.getElementById('soluprotSection').classList.add('hidden');
   document.getElementById('netSolPSection').classList.add('hidden');
   _recState.ps = null; _recState.sp = null; _recState.local = null;
+  _currentAnalysis = null;
 }
+
+// ─── Navigation ────────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  ['analyze','history','about'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
+    const nav = document.getElementById(`nav-${t}`);
+    nav.classList.toggle('tab-active', t === name);
+    nav.classList.toggle('tab-idle', t !== name);
+  });
+  if (name === 'history') renderHistory();
+  document.querySelector('main').scrollTop = 0;
+}
+
+// ─── History (localStorage) ────────────────────────────────────────────────
+
+const HIST_KEY = 'solpredict_history';
+
+function loadHist() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch { return []; }
+}
+
+function saveHistory(rec) {
+  const arr = loadHist();
+  arr.unshift(rec);
+  localStorage.setItem(HIST_KEY, JSON.stringify(arr.slice(0, 50)));
+}
+
+function clearHistory() {
+  if (!loadHist().length) return;
+  if (!confirm('確定清除所有歷史紀錄？')) return;
+  localStorage.removeItem(HIST_KEY);
+  renderHistory();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderHistory() {
+  const arr = loadHist();
+  const el = document.getElementById('historyList');
+  if (!arr.length) {
+    el.innerHTML = '<div class="text-center text-sm text-gray-400 py-16 leading-relaxed">尚無分析紀錄<br><span class="text-xs">在「分析」分頁完成一次分析後<br>會自動顯示於此</span></div>';
+    return;
+  }
+  el.innerHTML = arr.map(r => {
+    const badgeCls = { green:'badge-green', yellow:'badge-yellow', red:'badge-red' }[r.cat && r.cat.color] || 'badge-gray';
+    const psTxt = (r.ps === false || r.ps == null) ? '—' : Number(r.ps).toFixed(2);
+    const spTxt = (r.sp === false || r.sp == null) ? '—' : Number(r.sp).toFixed(2);
+    return `<div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <span class="text-sm font-semibold text-gray-900 font-mono truncate">${escapeHtml(r.name)}</span>
+        <span class="${badgeCls} text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0">${r.cat ? r.cat.label : '—'}</span>
+      </div>
+      <div class="text-xs text-gray-500">${r.len} aa · Protein-Sol ${psTxt} · SoluProt ${spTxt}</div>
+      <div class="text-[10px] text-gray-400 mt-1">${formatTime(r.ts)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Input listeners ───────────────────────────────────────────────────────
 
 document.getElementById('seqInput').addEventListener('input', function() {
   const seq = cleanSeq(this.value);
@@ -857,6 +971,14 @@ document.getElementById('seqInput').addEventListener('input', function() {
 document.getElementById('seqInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyze();
 });
+
+// ─── PWA service worker ────────────────────────────────────────────────────
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>

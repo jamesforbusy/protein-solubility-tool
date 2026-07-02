@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SolPredict — App Mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", sans-serif; }
+  .phone {
+    width: 300px; height: 640px;
+    border-radius: 36px;
+    background: #fff;
+    box-shadow: 0 20px 50px -12px rgba(0,0,0,.25), 0 0 0 10px #1f2937, 0 0 0 12px #374151;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 130px; height: 22px; background: #1f2937;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; z-index: 30;
+  }
+  .screen-body { flex: 1; overflow-y: auto; }
+  .screen-body::-webkit-scrollbar { width: 0; }
+  .badge-green  { background:#dcfce7; color:#166534; }
+  .badge-red    { background:#fee2e2; color:#991b1b; }
+  .badge-yellow { background:#fef9c3; color:#854d0e; }
+  .tab-active { color:#2563eb; }
+  .tab-idle   { color:#9ca3af; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen py-10 px-6">
+
+<div class="max-w-6xl mx-auto mb-8">
+  <h1 class="text-2xl font-bold text-gray-900">SolPredict — App 設計稿</h1>
+  <p class="text-sm text-gray-500 mt-1">蛋白質可溶性分析工具的 app 化 mockup。手機優先、底部分頁導覽、可安裝為 PWA（加到主畫面即可離線開啟外殼）。</p>
+  <div class="mt-3 flex flex-wrap gap-2 text-xs">
+    <span class="px-2 py-1 rounded bg-blue-50 text-blue-700 font-medium">PWA 可安裝</span>
+    <span class="px-2 py-1 rounded bg-green-50 text-green-700 font-medium">底部 3 分頁</span>
+    <span class="px-2 py-1 rounded bg-purple-50 text-purple-700 font-medium">本地歷史紀錄</span>
+    <span class="px-2 py-1 rounded bg-amber-50 text-amber-700 font-medium">結果卡片化</span>
+  </div>
+</div>
+
+<div class="flex gap-8 flex-wrap justify-center items-start">
+
+  <!-- ═══════════ SCREEN 1: 分析輸入 ═══════════ -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <!-- App bar -->
+      <div class="pt-7 pb-3 px-5 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-sm">🧬</div>
+            <span class="font-semibold">SolPredict</span>
+          </div>
+          <div class="text-xs bg-white/15 px-2 py-0.5 rounded-full">E. coli</div>
+        </div>
+      </div>
+      <!-- Body -->
+      <div class="screen-body px-5 py-4 bg-gray-50">
+        <h2 class="text-lg font-bold text-gray-900 mb-1">分析序列</h2>
+        <p class="text-xs text-gray-500 mb-4">貼上蛋白質序列，評估大腸桿菌可溶性表現風險</p>
+        <div class="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm">
+          <textarea rows="7" class="w-full text-xs font-mono text-gray-700 outline-none resize-none" placeholder="貼上 FASTA 或純序列…&#10;支援 gap 字元 -/. 自動去除">>Fc_region
+PSVFIFPPKPKDTLMISRTPEVTCVVVDVSHEDPEVKFNWYVDGVEVHNAKTKPREEQYNSTYRVVSVLTVLHQDWLNGKEYKC</textarea>
+        </div>
+        <div class="flex items-center justify-between mt-2 mb-4 px-1">
+          <span class="text-xs text-gray-400">82 aa</span>
+          <button class="text-xs text-blue-600 font-medium">載入範例</button>
+        </div>
+        <button class="w-full py-3 rounded-2xl bg-blue-600 text-white font-semibold shadow-sm shadow-blue-200 flex items-center justify-center gap-2">
+          <span>⚡</span> 開始分析
+        </button>
+        <p class="text-center text-xs text-gray-400 mt-3">3 項自動預測 · 約 15 秒</p>
+      </div>
+      <!-- Bottom nav -->
+      <div class="flex border-t border-gray-100 bg-white py-2">
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-active">
+          <span class="text-lg">🔬</span><span class="text-[10px] font-medium">分析</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle">
+          <span class="text-lg">🕐</span><span class="text-[10px]">歷史</span>
+        </div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle">
+          <span class="text-lg">ℹ️</span><span class="text-[10px]">關於</span>
+        </div>
+      </div>
+    </div>
+    <p class="text-center text-xs font-medium text-gray-500 mt-3">① 分析輸入</p>
+  </div>
+
+  <!-- ═══════════ SCREEN 2: 結果（綜合建議 + 卡片） ═══════════ -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="pt-7 pb-3 px-5 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">←</span>
+          <span class="font-semibold">分析結果</span>
+        </div>
+      </div>
+      <div class="screen-body px-4 py-4 bg-gray-50 space-y-3">
+        <!-- 綜合建議 -->
+        <div class="bg-white rounded-2xl border-2 border-green-400 p-4 shadow-sm">
+          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">綜合建議</div>
+          <div class="text-base font-bold text-green-700 mb-3">✅ 預測可溶（多數工具支持）</div>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-500">本地計算</span><span>✅ 預測可溶 <span class="text-gray-400 font-mono">1/8</span></span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-500">Protein-Sol</span><span>✅ 預測可溶 <span class="text-gray-400 font-mono">0.612</span></span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-500">SoluProt</span><span>⚠️ 中等 <span class="text-gray-400 font-mono">0.548</span></span>
+            </div>
+          </div>
+        </div>
+        <!-- 迷你工具卡：Protein-Sol -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-gray-900">Protein-Sol</span>
+            <span class="badge-green text-[10px] px-2 py-0.5 rounded-full font-medium">高可溶性</span>
+          </div>
+          <div class="text-3xl font-bold text-gray-900">0.612</div>
+          <div class="h-2 rounded-full bg-gray-100 mt-2 relative">
+            <div class="h-full rounded-full bg-green-400" style="width:61%"></div>
+            <div class="absolute top-0 h-full w-px bg-gray-400" style="left:45%"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-gray-400 mt-1"><span>0</span><span>平均 0.45</span><span>1</span></div>
+        </div>
+        <!-- 迷你工具卡：SoluProt -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-gray-900">SoluProt</span>
+            <span class="badge-yellow text-[10px] px-2 py-0.5 rounded-full font-medium">中等</span>
+          </div>
+          <div class="text-3xl font-bold text-gray-900">0.548</div>
+          <div class="h-2 rounded-full bg-gray-100 mt-2 relative">
+            <div class="h-full rounded-full bg-yellow-400" style="width:55%"></div>
+            <div class="absolute top-0 h-full w-px bg-gray-400" style="left:50%"></div>
+          </div>
+        </div>
+        <button class="w-full py-2.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-600">展開理化性質 · 風險因子 ▾</button>
+      </div>
+      <div class="flex border-t border-gray-100 bg-white py-2">
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-active"><span class="text-lg">🔬</span><span class="text-[10px] font-medium">分析</span></div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle"><span class="text-lg">🕐</span><span class="text-[10px]">歷史</span></div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle"><span class="text-lg">ℹ️</span><span class="text-[10px]">關於</span></div>
+      </div>
+    </div>
+    <p class="text-center text-xs font-medium text-gray-500 mt-3">② 結果（綜合建議置頂）</p>
+  </div>
+
+  <!-- ═══════════ SCREEN 3: 歷史紀錄 ═══════════ -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="pt-7 pb-3 px-5 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+        <span class="font-semibold">歷史紀錄</span>
+      </div>
+      <div class="screen-body px-4 py-4 bg-gray-50 space-y-2.5">
+        <p class="text-xs text-gray-400 px-1 mb-1">本機儲存，不上傳雲端</p>
+        <!-- item -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-semibold text-gray-900 font-mono">Fc_region</span>
+            <span class="badge-green text-[10px] px-2 py-0.5 rounded-full font-medium">可溶</span>
+          </div>
+          <div class="text-[11px] text-gray-500">82 aa · Protein-Sol 0.61 · SoluProt 0.55</div>
+          <div class="text-[10px] text-gray-400 mt-1">2026-07-02 14:31</div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-semibold text-gray-900 font-mono">ASPM_iso1</span>
+            <span class="badge-red text-[10px] px-2 py-0.5 rounded-full font-medium">不可溶</span>
+          </div>
+          <div class="text-[11px] text-gray-500">410 aa · Protein-Sol 0.32 · SoluProt 0.28</div>
+          <div class="text-[10px] text-gray-400 mt-1">2026-07-02 11:05</div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-semibold text-gray-900 font-mono">CRM197</span>
+            <span class="badge-yellow text-[10px] px-2 py-0.5 rounded-full font-medium">中等</span>
+          </div>
+          <div class="text-[11px] text-gray-500">535 aa · Protein-Sol 0.47 · SoluProt 0.51</div>
+          <div class="text-[10px] text-gray-400 mt-1">2026-07-01 16:48</div>
+        </div>
+      </div>
+      <div class="flex border-t border-gray-100 bg-white py-2">
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle"><span class="text-lg">🔬</span><span class="text-[10px]">分析</span></div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-active"><span class="text-lg">🕐</span><span class="text-[10px] font-medium">歷史</span></div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle"><span class="text-lg">ℹ️</span><span class="text-[10px]">關於</span></div>
+      </div>
+    </div>
+    <p class="text-center text-xs font-medium text-gray-500 mt-3">③ 歷史紀錄（本機）</p>
+  </div>
+
+  <!-- ═══════════ SCREEN 4: 關於/工具說明 ═══════════ -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="pt-7 pb-3 px-5 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+        <span class="font-semibold">關於工具</span>
+      </div>
+      <div class="screen-body px-4 py-4 bg-gray-50 space-y-2.5">
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">Protein-Sol</div>
+          <div class="text-[11px] text-gray-500">Manchester · 35 個序列特徵 · E. coli 資料庫</div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">SoluProt</div>
+          <div class="text-[11px] text-gray-500">Brno · 隨機森林 · 36 特徵 · 準確度 ~80%</div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">NetSolP <span class="text-[10px] text-amber-600">手動</span></div>
+          <div class="text-[11px] text-gray-500">DTU · ESM1b 語言模型 · AUC 0.760</div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-sm">
+          <div class="text-sm font-semibold text-gray-900 mb-0.5">本地計算</div>
+          <div class="text-[11px] text-gray-500">GRAVY · pI · 不穩定指數 · Kyte-Doolittle 跨膜偵測</div>
+        </div>
+        <div class="bg-blue-50 rounded-2xl border border-blue-100 p-3.5">
+          <div class="text-xs font-medium text-blue-800 mb-1">📲 安裝到主畫面</div>
+          <div class="text-[11px] text-blue-600">Safari/Chrome → 分享 → 加入主畫面，即可像原生 app 一樣開啟</div>
+        </div>
+      </div>
+      <div class="flex border-t border-gray-100 bg-white py-2">
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle"><span class="text-lg">🔬</span><span class="text-[10px]">分析</span></div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-idle"><span class="text-lg">🕐</span><span class="text-[10px]">歷史</span></div>
+        <div class="flex-1 flex flex-col items-center gap-0.5 tab-active"><span class="text-lg">ℹ️</span><span class="text-[10px] font-medium">關於</span></div>
+      </div>
+    </div>
+    <p class="text-center text-xs font-medium text-gray-500 mt-3">④ 關於 / PWA 安裝</p>
+  </div>
+
+</div>
+
+<div class="max-w-6xl mx-auto mt-10 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+  <h2 class="text-lg font-bold text-gray-900 mb-3">與現行版本的差異</h2>
+  <div class="grid md:grid-cols-2 gap-6 text-sm text-gray-600">
+    <div>
+      <div class="font-semibold text-gray-800 mb-2">現在（單頁網站）</div>
+      <ul class="space-y-1 list-disc list-inside text-gray-500">
+        <li>一頁到底往下捲動</li>
+        <li>桌機瀏覽器導向</li>
+        <li>無歷史紀錄，重整即消失</li>
+        <li>需記網址才能再訪</li>
+      </ul>
+    </div>
+    <div>
+      <div class="font-semibold text-gray-800 mb-2">App 化之後</div>
+      <ul class="space-y-1 list-disc list-inside text-gray-500">
+        <li>底部分頁：分析 / 歷史 / 關於</li>
+        <li>手機優先，可裝到主畫面（PWA）</li>
+        <li>localStorage 保存過往分析</li>
+        <li>結果卡片化，綜合建議置頂</li>
+        <li>離線開啟外殼（預測仍需連線呼叫 Worker）</li>
+      </ul>
+    </div>
+  </div>
+  <p class="text-xs text-gray-400 mt-4">技術方案維持輕量：純 HTML + Tailwind + 少量 JS，加上 manifest.json 與 service worker，不引入框架、不改動現有 Cloudflare Worker。</p>
+</div>
+
+</body>
+</html>
